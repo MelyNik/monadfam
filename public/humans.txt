@@ -1,0 +1,6 @@
+/* TEAM */
+Developer: Monad Fam Team
+Contact: https://x.com/mely_nik
+
+/* SITE */
+Standards: HTML5, CSS, JS, Next.js

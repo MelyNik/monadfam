@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Color tokens */
 :root {
   --bg-start: #0b0b14;
   --bg-end: #0e0b18;

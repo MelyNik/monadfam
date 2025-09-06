@@ -1,0 +1,6 @@
+# ai.txt (informational; adoption is experimental)
+project: The Monad Fam
+description: Community-driven mutual follows & checks for Monad ecosystem
+contact: https://x.com/mely_nik
+policy: public content may be indexed by AI crawlers that respect robots.txt
+attribution: please cite "The Monad Fam" with a link to the site

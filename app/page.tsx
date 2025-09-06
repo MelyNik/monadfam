@@ -7,7 +7,7 @@ export default function Page() {
             <div className="h-6 w-6 rounded-sm bg-white/10 grid place-items-center">◈</div>
             <span className="font-semibold tracking-wide">Monad</span>
           </div>
-          <a href="/profile" className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 transition">Профиль</a>
+          <a href="/profile" className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 transition">Profile</a>
           <div className="w-6" />
         </div>
       </header>
@@ -15,7 +15,7 @@ export default function Page() {
       <main className="max-w-5xl mx-auto px-4">
         <div className="pt-10 sm:pt-14 text-center">
           <h1 className="text-4xl sm:text-5xl font-extrabold">The Monad Fam</h1>
-          <p className="mt-2 text-white/70">для тех кто ищет семью</p>
+          <p className="mt-2 text-white/70">for those who are looking for a fam</p>
         </div>
 
         <div className="mt-8 flex justify-center">
@@ -34,8 +34,8 @@ export default function Page() {
                   <div className="text-sm text-white/60">Monad • X/Twitter</div>
                 </div>
                 <div className="flex gap-2">
-                  <a className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm" href="#">Пропустить</a>
-                  <a className="px-3 py-2 rounded-xl text-sm" style={{background:'var(--accent)'}} href="#">Подписаться</a>
+                  <a className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm" href="#">Skip</a>
+                  <a className="px-3 py-2 rounded-xl text-sm" style={{background:'var(--accent)'}} href="#">Follow</a>
                 </div>
               </div>
               <div className="h-1 w-full bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
@@ -46,26 +46,26 @@ export default function Page() {
         <section className="mt-12 mb-20">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">FAQ</h2>
-            <button className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">Показать обучение</button>
+            <button className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">Show tutorial</button>
           </div>
           <div className="space-y-2">
             <details className="rounded-xl p-4" style={{background:'var(--card)', border:'1px solid var(--border)'}}>
-              <summary className="cursor-pointer font-medium">Как начать?</summary>
-              <p className="mt-2 text-white/70">Войди через Discord и X (добавим позже), нажми Start и выбирай людей.</p>
+              <summary className="cursor-pointer font-medium">How do I start?</summary>
+              <p className="mt-2 text-white/70">Sign in with Discord and X (we’ll add it next), click Start, then choose people.</p>
             </details>
             <details className="rounded-xl p-4" style={{background:'var(--card)', border:'1px solid var(--border)'}}>
-              <summary className="cursor-pointer font-medium">Что значит «взаимная»?</summary>
-              <p className="mt-2 text-white/70">Вы подписаны друг на друга. Пока ожидаем — профиль помечен «ожидает взаимной».</p>
+              <summary className="cursor-pointer font-medium">What does “mutual” mean?</summary>
+              <p className="mt-2 text-white/70">You follow each other. Until then, the profile is marked “awaiting mutual”.</p>
             </details>
             <details className="rounded-xl p-4" style={{background:'var(--card)', border:'1px solid var(--border)'}}>
-              <summary className="cursor-pointer font-medium">Как работает рейтинг?</summary>
-              <p className="mt-2 text-white/70">Раз в 4 дня голосуешь: выполняет человек обязательства или нет. Цвет полосы меняется.</p>
+              <summary className="cursor-pointer font-medium">How does the rating work?</summary>
+              <p className="mt-2 text-white/70">Every 4 days you vote: does a person keep the pact or not. The color bar changes.</p>
             </details>
           </div>
         </section>
 
         <footer className="py-10 text-center text-white/60">
-          Связь: <a className="underline hover:text-white" href="https://x.com/mely_nik">@mely_nik</a>
+          Contact: <a className="underline hover:text-white" href="https://x.com/mely_nik">@mely_nik</a>
         </footer>
       </main>
     </div>

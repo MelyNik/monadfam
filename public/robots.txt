@@ -1,0 +1,10 @@
+# Allow all by default
+User-agent: *
+Allow: /
+
+# Friendly to AI crawlers (optional)
+User-agent: GPTBot
+Allow: /
+
+User-agent: CCBot
+Allow: /

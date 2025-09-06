@@ -1,30 +1,33 @@
-# The Monad Fam — MNT-001 (первый экран)
+# The Monad Fam — MNT-001 (landing skeleton)
 
-**Что уже есть**
-- Шапка с «Профиль» по центру
-- Заголовок «The Monad Fam» + слоган
-- Кнопка Start
-- Карточки людей с цветной полосой снизу
-- Страница /profile (разделы + статус-кнопки)
-- FAQ и кнопка «Показать обучение» на главной
-- Цвета в одном месте: `app/globals.css`
+This repo contains the first screen (landing) for The Monad Fam.
 
-## Как запустить без установки программ (рекомендую)
-1. Создай аккаунты на GitHub и Vercel (vercel.com).
-2. На GitHub создай репозиторий `monadfam` → **Create**.
-3. В репозитории **Add file → Upload files** → перетащи сюда **все файлы из архива**.
-4. Нажми **Commit changes**.
-5. На Vercel: **Add New → Project → Import Git Repository** → выбери `monadfam` → **Deploy**.
-6. Получишь ссылку на сайт.
+**What’s included**
+- Header with **Profile** centered
+- Title “The Monad Fam” + tagline
+- **Start** button
+- Mock user cards with a color rating stripe
+- **/profile** page (sections + status buttons)
+- FAQ + **Show tutorial** button on the home page
+- Colors in one place: `app/globals.css`
 
-## Как запустить локально (если умеешь)
-1. Поставь Node.js LTS.
-2. В терминале:
+## Deploy without installing anything
+1. Create accounts on GitHub and Vercel.
+2. Create a repo `monadfam` on GitHub and upload all files.
+3. On Vercel: **Add New → Project → Import Git Repository** → pick `monadfam` → **Deploy**.
+4. You’ll get your site URL.
+
+## Run locally
+1. Install Node.js LTS.
+2. In the terminal:
    npm install
    npm run dev
-3. Открой http://localhost:3000
+3. Open http://localhost:3000
 
-## Где менять
-- Цвета: `app/globals.css`
-- Главная: `app/page.tsx`
-- Профиль: `app/profile/page.tsx`
+## Edit text & colors
+- Home page: `app/page.tsx`
+- Profile: `app/profile/page.tsx`
+- Colors: `app/globals.css`
+
+## License
+Add a LICENSE you prefer (e.g., MIT) or keep the repo private if you don’t want others to reuse the code.
