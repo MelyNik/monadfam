@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-start: #0b0b14;
+  --bg-end: #0e0b18;
+  --card: rgba(255,255,255,0.05);
+  --border: rgba(255,255,255,0.10);
+  --accent: #7C5CFF;
+  --accent-hover: #9A86FF;
+}
+
+body { color: white; background: linear-gradient(135deg, var(--bg-start), var(--bg-end)); }
