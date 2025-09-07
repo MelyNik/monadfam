@@ -1,29 +1,151 @@
-export default function ProfilePage() {
+'use client'
+import { useMemo, useState } from 'react'
+
+type Row = { id:number; handle:string; days:number }
+
+const seedMutual: Row[] = [
+  {id:1, handle:'@alice', days:0},
+  {id:2, handle:'@bob', days:0},
+]
+const seedAwaitTheir: Row[] = [
+  {id:3, handle:'@carol', days:2},
+  {id:4, handle:'@dave', days:5},
+]
+const seedAwaitOurs: Row[] = [
+  {id:5, handle:'@erin', days:1},
+  {id:6, handle:'@frank', days:6},
+]
+
+export default function ProfilePage(){
+  const [shortLeft] = useState(4)
+  const [longLeft] = useState(1)
+  const [longCooldownDays] = useState(27)
+
+  const [mutual,setMutual] = useState<Row[]>(seedMutual)
+  const [awaitTheir,setAwaitTheir] = useState<Row[]>(seedAwaitTheir)
+  const [awaitOurs,setAwaitOurs] = useState<Row[]>(seedAwaitOurs)
+
+  type Tab = 'mutual'|'await_their'|'await_ours'
+  const [tab,setTab] = useState<Tab>('mutual')
+
+  const [q,setQ] = useState('')
+  const norm = (s:string)=>s.toLowerCase().replace(/^@/,'')
+  const matches = (h:string)=> norm(h).includes(norm(q))
+
+  const counts = {
+    mutual: mutual.length,
+    await_their: awaitTheir.length,
+    await_ours: awaitOurs.length,
+  }
+
+  const rows = useMemo(()=>{
+    const list = tab==='mutual'?mutual: tab==='await_their'?awaitTheir:awaitOurs
+    return list.filter(r=>matches(r.handle))
+  },[tab, mutual, awaitTheir, awaitOurs, q])
+
+  const unfollowFromMutual = (r:Row)=>{
+    setMutual(prev=>prev.filter(x=>x.id!==r.id))
+    setAwaitOurs(prev=>[{...r, days:0}, ...prev])
+  }
+  const declineFromAwaitOurs = (r:Row)=>{
+    setAwaitOurs(prev=>prev.filter(x=>x.id!==r.id))
+  }
+  const unfollowFromAwaitTheir = (r:Row)=>{
+    setAwaitTheir(prev=>prev.filter(x=>x.id!==r.id))
+  }
+
   return (
-    <div className="min-h-screen max-w-4xl mx-auto px-4 py-8 text-white">
+    <div className="min-h-screen max-w-6xl mx-auto px-4 py-8 text-white">
       <h1 className="text-3xl font-bold mb-6">Profile</h1>
 
-      <div className="flex flex-wrap gap-2 mb-6">
+      <div className="flex flex-wrap items-center gap-2 mb-6">
         <button className="px-4 py-2 rounded-xl bg-white/15">Online</button>
-        <button className="px-4 py-2 rounded-xl bg-white/10">Short absence</button>
-        <button className="px-4 py-2 rounded-xl bg-white/10">Long absence</button>
+        <button className="px-4 py-2 rounded-xl bg-white/10">
+          Short absence · {shortLeft>0?`${shortLeft} left`:'available in 1d'}
+        </button>
+        <button className="px-4 py-2 rounded-xl bg-white/10">
+          Long absence · {longLeft>0?`${longLeft} left`:`${longCooldownDays}d`}
+        </button>
       </div>
 
-      <div className="flex gap-4 text-white/80 mb-4">
-        <span>Mutual: 0</span>
-        <span>Awaiting mutual: 0</span>
-        <span>Total: 0</span>
+      <div className="card p-2 mb-3">
+        <div className="grid md:grid-cols-3 gap-2">
+          <button onClick={()=>setTab('mutual')} className={`px-4 py-3 rounded-xl font-medium ${tab==='mutual'?'bg-white/10':''}`}>
+            Following each other <span className="text-white/60">({counts.mutual})</span>
+          </button>
+          <button onClick={()=>setTab('await_their')} className={`px-4 py-3 rounded-xl font-medium ${tab==='await_their'?'bg-white/10':''}`}>
+            Awaiting follow-back <span className="text-white/60">({counts.await_their})</span>
+          </button>
+          <button onClick={()=>setTab('await_ours')} className={`px-4 py-3 rounded-xl font-medium ${tab==='await_ours'?'bg-white/10':''}`}>
+            Waiting for our follow <span className="text-white/60">({counts.await_ours})</span>
+          </button>
+        </div>
+        <div className="mt-3">
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search by @handle or name" className="input w-full" />
+        </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <section className="rounded-xl p-4" style={{background:'var(--card)', border:'1px solid var(--border)'}}>
-          <h2 className="font-semibold mb-3">Mutual</h2>
-          <p className="text-white/60">Nothing yet.</p>
-        </section>
-        <section className="rounded-xl p-4" style={{background:'var(--card)', border:'1px solid var(--border)'}}>
-          <h2 className="font-semibold mb-3">Awaiting mutual</h2>
-          <p className="text-white/60">Nothing yet.</p>
-        </section>
+      <div className="grid lg:grid-cols-3 gap-6">
+        <aside className="card p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="h-16 w-16 rounded-full bg-white/10" />
+            <div>
+              <div className="font-semibold">@your_handle</div>
+              <div className="text-sm text-[var(--muted)]">Your X profile</div>
+            </div>
+          </div>
+          <div className="space-y-2 text-sm text-[var(--muted)]">
+            <div>Bio: … <button className="text-white/90 underline">Refresh</button></div>
+            <div>Followers: 0 <button className="text-white/90 underline">Refresh</button></div>
+            <div>Following: 0 <button className="text-white/90 underline">Refresh</button></div>
+            <div>Posts: 0 <button className="text-white/90 underline">Refresh</button></div>
+          </div>
+        </aside>
+
+        <main className="card p-3">
+          <div className="max-h-[60vh] overflow-auto space-y-3 pr-1">
+            {rows.length===0 && <div className="text-white/60 p-3">Nothing found.</div>}
+            {rows.map(r=>{
+              const overdue = r.days>=4
+              return (
+                <div key={r.id} className={`flex items-center justify-between rounded-xl p-3 ${overdue?'bg-red-500/10':'bg-white/5'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-white/10" />
+                    <div className="font-medium">{r.handle}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a className="btn bg-white/10 hover:bg-white/15 text-sm" href="#">Open in X</a>
+                    {tab==='mutual' && (
+                      <button onClick={()=>unfollowFromMutual(r)} className="btn bg-white/10 hover:bg-white/15 text-sm">Unfollow</button>
+                    )}
+                    {tab==='await_ours' && (
+                      <button onClick={()=>declineFromAwaitOurs(r)} className="btn bg-white/10 hover:bg-white/15 text-sm">Decline</button>
+                    )}
+                    {tab==='await_their' && (
+                      <button onClick={()=>unfollowFromAwaitTheir(r)} className="btn bg-white/10 hover:bg-white/15 text-sm">Unfollow</button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </main>
+
+        <aside className="card p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="h-16 w-16 rounded-full bg-white/10" />
+            <div>
+              <div className="font-semibold">@selected_user</div>
+              <div className="text-sm text-[var(--muted)]">Selected user</div>
+            </div>
+          </div>
+          <div className="space-y-2 text-sm text-[var(--muted)]">
+            <div>Bio: … <button className="text-white/90 underline">Refresh</button></div>
+            <div>Followers: 0 <button className="text-white/90 underline">Refresh</button></div>
+            <div>Following: 0 <button className="text-white/90 underline">Refresh</button></div>
+            <div>Posts: 0 <button className="text-white/90 underline">Refresh</button></div>
+          </div>
+        </aside>
       </div>
     </div>
   )

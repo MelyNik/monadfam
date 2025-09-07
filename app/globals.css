@@ -2,14 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Color tokens */
 :root {
   --bg-start: #0b0b14;
   --bg-end: #0e0b18;
-  --card: rgba(255,255,255,0.05);
-  --border: rgba(255,255,255,0.10);
+  --card: rgba(255,255,255,0.06);
+  --border: rgba(255,255,255,0.12);
   --accent: #7C5CFF;
   --accent-hover: #9A86FF;
+  --muted: rgba(255,255,255,0.6);
 }
 
-body { color: white; background: linear-gradient(135deg, var(--bg-start), var(--bg-end)); }
+body { color:white; background:linear-gradient(135deg,var(--bg-start),var(--bg-end)); }
+.card { background:var(--card); border:1px solid var(--border); border-radius:1.25rem; }
+.input { background:rgba(255,255,255,0.08); border:1px solid var(--border); border-radius:0.75rem; padding:0.6rem 0.8rem; }
+.btn { border-radius:0.75rem; padding:0.5rem 0.8rem; }
