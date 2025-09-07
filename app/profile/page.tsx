@@ -85,27 +85,25 @@ export default function ProfilePage(){
         </div>
       </div>
 
-      {/* geometry: fixed side columns 340px, center flexible */}
-      <div className="grid gap-8 items-start [grid-template-columns:340px_minmax(0,1fr)_340px]">
-        {/* LEFT */}
-        <aside className="card p-5 flex flex-col items-center">
+      {/* LAYOUT: flex with fixed side columns (340px) and wide center */}
+      <div className="flex gap-8 items-start">
+        {/* LEFT FIXED CARD */}
+        <aside className="card p-5 flex-shrink-0 w-[340px] flex flex-col items-center">
           <div className="avatar-ring-xl"><div className="avatar-ring-xl-inner">
             <img src={yourAvatar} alt="you" className="avatar-xl"/>
           </div></div>
-
           <div className="mt-5 text-center">
             <div className="font-semibold text-lg">Your name</div>
             <div className="text-sm text-white/70">@your_handle</div>
           </div>
-
           <div className="mt-6 w-full space-y-3 text-white/80">
             <div className="flex items-center justify-between"><span>Followers (site)</span><span>{siteFollowers}</span></div>
             <div className="flex items-center justify-between"><span>Following (site)</span><span>{siteFollowing}</span></div>
           </div>
         </aside>
 
-        {/* CENTER rows */}
-        <main className="">
+        {/* CENTER — flexible, long rows */}
+        <main className="flex-1 min-w-0">
           <div className="space-y-4">
             {rows.length===0 && <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r=>{
@@ -118,13 +116,11 @@ export default function ProfilePage(){
                       <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
                     </div></div>
                   </div>
-
                   {/* centered name/handle */}
                   <div className="text-center">
                     <div className="font-semibold leading-5">{r.name}</div>
                     <div className="text-white/70 text-sm">{r.handle}</div>
                   </div>
-
                   {/* actions */}
                   <div className="justify-self-end flex items-center gap-2">
                     <a className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm" href="#">Open in X</a>
@@ -138,17 +134,15 @@ export default function ProfilePage(){
           </div>
         </main>
 
-        {/* RIGHT */}
-        <aside className="card p-5 flex flex-col items-center">
+        {/* RIGHT FIXED CARD */}
+        <aside className="card p-5 flex-shrink-0 w-[340px] flex flex-col items-center">
           <div className="avatar-ring-xl"><div className="avatar-ring-xl-inner">
             <img src={selectedAvatar} alt="selected" className="avatar-xl"/>
           </div></div>
-
           <div className="mt-5 text-center">
             <div className="font-semibold text-lg">Selected_user name</div>
             <div className="text-sm text-white/70">@selected_user</div>
           </div>
-
           <div className="mt-6 w-full space-y-3 text-white/80">
             <div className="flex items-center justify-between"><span>Followers (site)</span><span>0</span></div>
             <div className="flex items-center justify-between"><span>Following (site)</span><span>0</span></div>
@@ -158,4 +152,3 @@ export default function ProfilePage(){
     </div>
   )
 }
-
