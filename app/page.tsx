@@ -1,129 +1,132 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { AppState, Row, loadState, saveState, takeNextFromPool, advancePool } from '@/lib/state'
 
-type SlideUser = {
-  name: string
-  handle: string // с @
-  avatarUrl?: string | null
-}
-
-/** ВРЕМЕННО для демо:
- * 1) Если есть avatarUrl — используем его.
- * 2) Если есть только @handle — пробуем взять картинку через unavatar (неофициально).
- *    В продакшене заменим на X API (users.read → /2/users/me) после логина.
- */
-function getAvatarSrc(u: SlideUser) {
-  if (u.avatarUrl) return u.avatarUrl
-  const h = u.handle.replace('@', '')
-  return `https://unavatar.io/x/${h}` // временно; позже будет X API
-}
-
-export default function Page() {
-  // ДЕМО-данные карточки (после авторизации подменим реальными)
-  const user: SlideUser = useMemo(
-    () => ({
-      name: 'Nik',
-      handle: '@user1',
-      // avatarUrl: 'https://...' // можно проставить, если хочешь жёстко
-    }),
-    []
+function RatingBar() {
+  return (
+    <div className="h-2 rounded-full"
+      style={{ background: 'linear-gradient(90deg,#22c55e,#eab308,#ef4444)' }} />
   )
+}
 
-  const [started, setStarted] = useState(false)
+export default function HomePage() {
+  const [state, setState] = useState<AppState | null>(null)
+  const [showTutorial, setShowTutorial] = useState(false)
+
+  // load from localStorage
+  useEffect(() => {
+    const s = loadState()
+    setState(s)
+    if (!s.tutorialDone) setShowTutorial(true)
+  }, [])
+
+  const candidate: Row | null = useMemo(() => {
+    if (!state) return null
+    const s = structuredClone(state)
+    return takeNextFromPool(s)
+  }, [state])
+
+  if (!state) return null
+
+  const disabledByStatus = state.status.mode !== 'online'
+
+  const doSkip = () => {
+    const s = structuredClone(state)
+    advancePool(s)
+    saveState(s)
+    setState(s)
+  }
+
+  const doFollow = () => {
+    if (!candidate) return
+    const s = structuredClone(state)
+    // отправляем в «Waiting for our follow»
+    s.lists.await_ours = [{ ...candidate, days: 0 }, ...s.lists.await_ours]
+    advancePool(s)
+    saveState(s)
+    setState(s)
+  }
+
+  const markTutorialDone = () => {
+    const s = structuredClone(state)
+    s.tutorialDone = true
+    saveState(s)
+    setState(s)
+    setShowTutorial(false)
+  }
 
   return (
-    <div className="min-h-screen w-full text-white">
-      {/* Шапка как была: без разделителя, Profile по центру */}
-      <header className="sticky top-0 z-20">
-        <div className="max-w-5xl mx-auto px-4 py-4 grid grid-cols-3 items-center">
-          <div className="flex items-center gap-2 text-white/80">
-            <div className="h-6 w-6 rounded-sm bg-white/10 grid place-items-center">◈</div>
-            <span className="font-semibold tracking-wide">Monad</span>
-          </div>
-          <div className="flex justify-center">
-            <a href="/profile" className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 transition">
-              Profile
-            </a>
-          </div>
-          <div />
-        </div>
-      </header>
+    <div className="min-h-screen max-w-[1000px] mx-auto px-6 py-8 text-white">
+      <h1 className="text-5xl font-extrabold text-center mb-2">The Monad Fam</h1>
+      <p className="text-center mb-8 text-white/70">for those who are looking for a fam</p>
 
-      <main className="max-w-3xl mx-auto px-4">
-        <div className="pt-8 text-center">
-          <h1 className="text-4xl sm:text-5xl font-extrabold">The Monad Fam</h1>
-          <p className="mt-2 text-white/70">for those who are looking for a fam</p>
-        </div>
+      {/* карточка по центру */}
+      <div className="card mx-auto max-w-[520px] px-8 py-8 text-center">
+        {candidate ? (
+          <>
+            <img
+              alt={candidate.handle}
+              src={candidate.avatarUrl || 'https://unavatar.io/x/twitter'}
+              className="mx-auto mb-4 rounded-full w-40 h-40 object-cover border-2 border-white"
+            />
+            <div className="text-xl font-semibold">{candidate.name}</div>
+            <div className="text-white/70 mb-4">{candidate.handle}</div>
+            <RatingBar />
 
-        {/* До старта — только большая кнопка Start */}
-        {!started && (
-          <div className="mt-10 flex justify-center">
-            <button
-              onClick={() => setStarted(true)}
-              className="px-12 py-5 text-lg rounded-2xl shadow-lg"
-              style={{ background: 'var(--accent)' }}
-            >
-              Start
-            </button>
-          </div>
-        )}
-
-        {/* После Start — одна вертикальная «карта» с аватаром → имя → логин → полоска */}
-        {started && (
-          <section className="mt-10 flex flex-col items-center gap-4">
-            <article className="card w-full max-w-sm overflow-hidden flex flex-col items-center">
-              {/* Аватар из X (круг, БЕЗ рейтингового кольца) */}
-              <div className="w-full flex-1 flex items-center justify-center p-8">
-                <img
-                  src={getAvatarSrc(user)}
-                  alt={`${user.handle} avatar`}
-                  className="h-40 w-40 rounded-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-
-              {/* Имя и логин — строго по центру, одно под другим */}
-              <div className="w-full px-6 pb-4 text-center">
-                <div className="text-2xl font-semibold">{user.name}</div>
-                <div className="text-sm text-white/70">{user.handle}</div>
-              </div>
-
-              {/* РЕЙТИНГОВАЯ ПОЛОСА только под карточкой */}
-              <div className="h-1.5 w-full bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
-            </article>
-
-            {/* Кнопки под картой */}
-            <div className="flex gap-3">
-              <button className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">Skip</button>
-              <button className="px-4 py-2 rounded-xl" style={{ background: 'var(--accent)' }}>
+            <div className="mt-6 flex justify-center gap-3">
+              <button onClick={doSkip} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
+                Skip
+              </button>
+              <button
+                onClick={doFollow}
+                disabled={disabledByStatus}
+                className={`px-4 py-2 rounded-xl ${disabledByStatus ? 'bg-white/10 opacity-60 cursor-not-allowed' : 'bg-[#7C5CFF] hover:bg-[#9A86FF]'}`}
+              >
                 Follow
               </button>
             </div>
-          </section>
+            {disabledByStatus && (
+              <div className="mt-3 text-sm text-white/60">
+                You are not online now. Set status to <b>Online</b> to follow.
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="py-10 text-white/70">No more profiles in the demo pool.</div>
         )}
+      </div>
 
-        {/* FAQ + Show tutorial — как было */}
-        <section className="mt-14 mb-24 max-w-3xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">FAQ</h2>
-            <button className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">Show tutorial</button>
+      {/* FAQ + tutorial */}
+      <div className="max-w-[900px] mx-auto mt-10">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xl font-semibold">FAQ</h2>
+          <button onClick={() => setShowTutorial(true)} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
+            Show tutorial
+          </button>
+        </div>
+
+        <details className="card p-4 mb-2"><summary>How do I start?</summary><div className="mt-2 text-sm text-white/80">Press Follow or Skip. Follow moves a profile to your “Waiting for our follow”.</div></details>
+        <details className="card p-4 mb-2"><summary>What does “mutual” mean?</summary><div className="mt-2 text-sm text-white/80">It means you both follow each other.</div></details>
+        <details className="card p-4 mb-2"><summary>How does the rating work?</summary><div className="mt-2 text-sm text-white/80">Later we’ll add community voting. For now it’s a demo bar.</div></details>
+      </div>
+
+      {/* Tutorial overlay */}
+      {showTutorial && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="card max-w-[520px] w-[92%] p-6">
+            <h3 className="text-2xl font-bold mb-2">Quick tutorial</h3>
+            <ol className="list-decimal pl-6 space-y-2 text-white/90">
+              <li>Press <b>Follow</b> to add a person to “Waiting for our follow”.</li>
+              <li>Press <b>Skip</b> to see the next person.</li>
+              <li>Open your <b>Profile</b> to manage lists and statuses.</li>
+            </ol>
+            <div className="mt-5 flex gap-2 justify-end">
+              <button className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15" onClick={() => setShowTutorial(false)}>Close</button>
+              <button className="px-3 py-2 rounded-xl bg-[#7C5CFF] hover:bg-[#9A86FF]" onClick={markTutorialDone}>Got it</button>
+            </div>
           </div>
-          <div className="space-y-2">
-            <details className="card p-4">
-              <summary className="cursor-pointer font-medium">How do I start?</summary>
-              <p className="mt-2 text-white/70">Sign in with Discord and X (coming next), click Start, then choose people.</p>
-            </details>
-            <details className="card p-4">
-              <summary className="cursor-pointer font-medium">What does “mutual” mean?</summary>
-              <p className="mt-2 text-white/70">You follow each other. Until then, the profile is marked “awaiting follow-back”.</p>
-            </details>
-            <details className="card p-4">
-              <summary className="cursor-pointer font-medium">How does the rating work?</summary>
-              <p className="mt-2 text-white/70">Every 4 days you vote: keeps the pact or not. The color bar changes.</p>
-            </details>
-          </div>
-        </section>
-      </main>
+        </div>
+      )}
     </div>
   )
 }

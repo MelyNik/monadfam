@@ -1,113 +1,157 @@
 'use client'
-import { useMemo, useState } from 'react'
-
-type Flag = 'red' | undefined
-type Row = {
-  id: number
-  name: string
-  handle: string
-  days: number
-  score: number
-  avatarUrl?: string
-  flag?: Flag
-}
-
-const seedMutual: Row[] = [
-  { id: 1, name: 'name', handle: '@alice', days: 0, score: 92, avatarUrl: 'https://unavatar.io/x/alice' },
-  { id: 2, name: 'name', handle: '@bob',   days: 0, score: 88, avatarUrl: 'https://unavatar.io/x/bob'   },
-]
-const seedAwaitTheir: Row[] = [
-  { id: 3, name: 'name', handle: '@carol', days: 2, score: 75, avatarUrl: 'https://unavatar.io/x/carol' },
-  { id: 4, name: 'name', handle: '@dave',  days: 5, score: 40, avatarUrl: 'https://unavatar.io/x/dave'  },
-]
-const seedAwaitOurs: Row[] = [
-  { id: 5, name: 'name', handle: '@erin',  days: 1, score: 83, avatarUrl: 'https://unavatar.io/x/erin'  },
-  { id: 6, name: 'name', handle: '@frank', days: 6, score: 30, avatarUrl: 'https://unavatar.io/x/frank' },
-]
+import { useEffect, useMemo, useState } from 'react'
+import { AppState, Row, loadState, saveState } from '@/lib/state'
 
 const yourAvatar     = 'https://unavatar.io/x/your_handle'
 const selectedAvatar = 'https://unavatar.io/x/selected_user'
 
 type Tab = 'mutual' | 'await_their' | 'await_ours'
 
-export default function ProfilePage() {
-  // statuses (счётчики просто для вида)
-  const [shortLeft]        = useState(4)
-  const [longLeft]         = useState(1)
-  const [longCooldownDays] = useState(27)
-  const [siteFollowers]    = useState(0)
-  const [siteFollowing]    = useState(0)
+export default function ProfilePage(){
+  const [state, setState] = useState<AppState | null>(null)
+  const [tab, setTab]     = useState<Tab>('mutual')
+  const [q, setQ]         = useState('')
 
-  // основные списки
-  const [mutual,      setMutual]      = useState<Row[]>(seedMutual)
-  const [awaitTheir,  setAwaitTheir]  = useState<Row[]>(seedAwaitTheir)
-  const [awaitOurs,   setAwaitOurs]   = useState<Row[]>(seedAwaitOurs)
+  // tick для обратного таймера short
+  useEffect(() => {
+    const s = loadState()
+    setState(s)
+    const t = setInterval(() => {
+      setState(prev => {
+        if (!prev) return prev
+        const ns = structuredClone(prev)
+        // авто-возврат из short, если истёк
+        if (ns.status.mode === 'short' && ns.status.shortUntil && Date.now() >= ns.status.shortUntil) {
+          ns.status.mode = 'online'
+          ns.status.shortUntil = undefined
+          saveState(ns)
+        }
+        return ns
+      })
+    }, 1000)
+    return () => clearInterval(t)
+  }, [])
 
-  // мягко удалённые строки (для восстановления)
-  const [removed, setRemoved] = useState<Array<{ from: 'await_their' | 'await_ours', row: Row }>>([])
-
-  const [tab, setTab] = useState<Tab>('mutual')
+  if (!state) return null
 
   // поиск
-  const [q, setQ] = useState('')
-  const norm = (s: string) => s.toLowerCase().replace(/^@/, '')
-  const match = (r: Row) => norm(r.handle).includes(norm(q)) || norm(r.name).includes(norm(q))
+  const norm  = (s: string) => s.toLowerCase().replace(/^@/, '')
+  const match = (r: Row)    => norm(r.handle).includes(norm(q)) || norm(r.name).includes(norm(q))
 
-  const counts = { mutual: mutual.length, await_their: awaitTheir.length, await_ours: awaitOurs.length }
+  const lists   = state.lists
+  const removed = state.removed
 
   const rows = useMemo(() => {
-    const list = tab === 'mutual' ? mutual : tab === 'await_their' ? awaitTheir : awaitOurs
+    const list = tab === 'mutual' ? lists.mutual : tab === 'await_their' ? lists.await_their : lists.await_ours
     return list.filter(match)
-  }, [tab, mutual, awaitTheir, awaitOurs, q])
+  }, [tab, lists, q])
 
-  // --- helpers ---
-  const confirm = (msg = 'Confirm your choice?') => window.confirm(msg)
+  const counts = { mutual: lists.mutual.length, await_their: lists.await_their.length, await_ours: lists.await_ours.length }
 
-  // Following each other → Unfollow
+  // ===== действия со списками (все пишем в localStorage) =====
+  const write = (ns: AppState) => { saveState(ns); setState(ns) }
+
   const unfollowFromMutual = (r: Row) => {
     if (!confirm()) return
-    setMutual(prev => prev.filter(x => x.id !== r.id))
-    // у нас: он остаётся на нас → мы видим его в "Waiting for our follow" с красным
-    setAwaitOurs(prev => [{ ...r, flag: 'red' }, ...prev])
+    const ns = structuredClone(state)
+    ns.lists.mutual = ns.lists.mutual.filter(x => x.id !== r.id)
+    // по твоему правилу — просто переносим к «Waiting for our follow», days=0
+    ns.lists.await_ours = [{ ...r, days: 0 }, ...ns.lists.await_ours]
+    write(ns)
   }
 
-  // Waiting for their follow-back → Unfollow (просто скрываем у себя)
   const unfollowFromAwaitTheir = (r: Row) => {
     if (!confirm()) return
-    setAwaitTheir(prev => prev.filter(x => x.id !== r.id))
+    const ns = structuredClone(state)
+    ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
+    write(ns)
   }
 
-  // Waiting for our follow → Follow (становимся взаимными)
   const followFromAwaitOurs = (r: Row) => {
-    setAwaitOurs(prev => prev.filter(x => x.id !== r.id))
-    setMutual(prev => [{ ...r, flag: undefined, days: 0 }, ...prev])
+    const ns = structuredClone(state)
+    ns.lists.await_ours = ns.lists.await_ours.filter(x => x.id !== r.id)
+    ns.lists.mutual     = [{ ...r, days: 0 }, ...ns.lists.mutual]
+    write(ns)
   }
 
-  // Waiting for our follow → Decline (исчезает у нас)
   const declineFromAwaitOurs = (r: Row) => {
     if (!confirm()) return
-    setAwaitOurs(prev => prev.filter(x => x.id !== r.id))
+    const ns = structuredClone(state)
+    ns.lists.await_ours = ns.lists.await_ours.filter(x => x.id !== r.id)
+    write(ns)
   }
 
-  // крестики: мягкое скрытие из «их фоллоу-бэк» и «нашего фоллоу»
+  // мягкое удаление крестиком
   const softRemove = (from: 'await_their' | 'await_ours', r: Row) => {
     if (!confirm()) return
-    if (from === 'await_their') setAwaitTheir(prev => prev.filter(x => x.id !== r.id))
-    if (from === 'await_ours')  setAwaitOurs(prev  => prev.filter(x => x.id !== r.id))
-    setRemoved(prev => [{ from, row: r }, ...prev])
+    const ns = structuredClone(state)
+    if (from === 'await_their') ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
+    if (from === 'await_ours')  ns.lists.await_ours  = ns.lists.await_ours .filter(x => x.id !== r.id)
+    ns.removed = [{ from, row: r }, ...ns.removed]
+    write(ns)
   }
 
   const restoreRemoved = () => {
-    if (removed.length === 0) return
-    // возвращаем в те же вкладки
+    if (!removed.length) return
+    const ns = structuredClone(state)
     removed.forEach(({ from, row }) => {
-      if (from === 'await_their') setAwaitTheir(prev => [row, ...prev])
-      if (from === 'await_ours')  setAwaitOurs(prev  => [row, ...prev])
+      if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
+      if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours]
     })
-    setRemoved([])
+    ns.removed = []
+    write(ns)
   }
 
-  // табы
+  // ===== статусы =====
+  const toOnline = () => {
+    const ns = structuredClone(state)
+    ns.status.mode = 'online'
+    ns.status.shortUntil = undefined
+    ns.status.longActive = false
+    write(ns)
+  }
+
+  // Short: включаем на 2 дня (MVP), счётчик / месяц, таймер и зелёный фон
+  const activateShort = () => {
+    const ns = structuredClone(state)
+    if (ns.status.mode === 'short') return // уже включен
+    if (ns.status.shortLeft <= 0) { alert('No short absences left this month'); return }
+    const TWO_DAYS = 2 * 24 * 60 * 60 * 1000
+    ns.status.mode = 'short'
+    ns.status.shortLeft -= 1
+    ns.status.shortUntil = Date.now() + TWO_DAYS
+    write(ns)
+  }
+
+  // Long: тумблер с красным фоном; 1 раз в месяц
+  const toggleLong = () => {
+    const ns = structuredClone(state)
+    if (ns.status.mode === 'long') {
+      // Stop
+      ns.status.mode = 'online'
+      ns.status.longActive = false
+      write(ns)
+      return
+    }
+    if (ns.status.longLeft <= 0) { alert('No long absence left this month'); return }
+    ns.status.mode = 'long'
+    ns.status.longLeft -= 1
+    ns.status.longActive = true
+    ns.status.longUsedAt = Date.now()
+    write(ns)
+  }
+
+  // формат обратного таймера
+  const shortCountdown = useMemo(() => {
+    if (state.status.mode !== 'short' || !state.status.shortUntil) return ''
+    const left = Math.max(0, state.status.shortUntil - Date.now())
+    const sec  = Math.floor(left / 1000)
+    const h = Math.floor(sec / 3600).toString().padStart(2, '0')
+    const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0')
+    const s = Math.floor(sec % 60).toString().padStart(2, '0')
+    return `${h}:${m}:${s}`
+  }, [state])
+
   const tabBtn = (kind: Tab, label: string, count: number) => {
     const active = tab === kind ? 'bg-white/10' : ''
     return (
@@ -117,27 +161,43 @@ export default function ProfilePage() {
     )
   }
 
+  const overdue = (r: Row) =>
+    (tab === 'await_their' || tab === 'await_ours') && r.days >= 4
+
   return (
     <div className="min-h-screen max-w-[1600px] mx-auto px-8 py-8 text-white">
       <h1 className="text-3xl font-bold mb-6">Profile</h1>
 
       {/* statuses + restore */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
-        <button className="px-4 py-2 rounded-xl bg-white/15">Online</button>
-        <button className="px-4 py-2 rounded-xl bg-white/10">
-          Short absence · {shortLeft > 0 ? `${shortLeft} left` : 'available in 1d'}
+        <button
+          className="px-4 py-2 rounded-xl bg-white/15"
+          onClick={toOnline}
+        >
+          Online
         </button>
-        <button className="px-4 py-2 rounded-xl bg-white/10">
-          Long absence · {longLeft > 0 ? `${longLeft} left` : `${longCooldownDays}d`}
+
+        <button
+          onClick={activateShort}
+          className={`px-4 py-2 rounded-xl ${state.status.mode === 'short' ? 'bg-green-600/30' : 'bg-white/10'} `}
+          title="Short absence: up to 2 days"
+        >
+          {state.status.mode === 'short'
+            ? `Pause · ${shortCountdown}`
+            : `Short absence · ${state.status.shortLeft} left`}
+        </button>
+
+        <button
+          onClick={toggleLong}
+          className={`px-4 py-2 rounded-xl ${state.status.mode === 'long' ? 'bg-red-600/30' : 'bg-white/10'} `}
+          title="Long absence: one per month"
+        >
+          {state.status.mode === 'long' ? 'Stop' : `Long absence · ${state.status.longLeft} left`}
         </button>
 
         <div className="grow" />
-        <button
-          onClick={restoreRemoved}
-          className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15"
-          title="Return profiles you removed with the small cross"
-        >
-          Restore removed profiles {removed.length ? `(${removed.length})` : ''}
+        <button onClick={restoreRemoved} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
+          Restore removed profiles {state.removed.length ? `(${state.removed.length})` : ''}
         </button>
       </div>
 
@@ -149,29 +209,23 @@ export default function ProfilePage() {
           {tabBtn('await_ours', 'Waiting for our follow', counts.await_ours)}
         </div>
         <div className="mt-3">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search by @handle or name"
-            className="input w-full"
-          />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search by @handle or name" className="input w-full" />
         </div>
       </div>
 
-      {/* THREE COLUMNS: left fixed, center flexible, right fixed */}
       <div className="flex gap-8 items-start">
         {/* LEFT CARD */}
         <aside className="card p-5 flex-shrink-0 w-[360px] flex flex-col items-center">
           <div className="avatar-ring-xl"><div className="avatar-ring-xl-inner">
-            <img src={yourAvatar} alt="you" className="avatar-xl" />
+            <img src={yourAvatar} alt="you" className="avatar-xl"/>
           </div></div>
           <div className="mt-5 text-center">
             <div className="font-semibold text-lg">Your name</div>
             <div className="text-sm text-white/70">@your_handle</div>
           </div>
           <div className="mt-6 w-full space-y-3 text-white/80">
-            <div className="flex items-center justify-between"><span>Followers (site)</span><span>{siteFollowers}</span></div>
-            <div className="flex items-center justify-between"><span>Following (site)</span><span>{siteFollowing}</span></div>
+            <div className="flex items-center justify-between"><span>Followers (site)</span><span>0</span></div>
+            <div className="flex items-center justify-between"><span>Following (site)</span><span>0</span></div>
           </div>
         </aside>
 
@@ -179,19 +233,16 @@ export default function ProfilePage() {
         <main className="flex-1 min-w-0">
           <div className="space-y-4">
             {rows.length === 0 && <div className="text-white/60 p-3">Nothing found.</div>}
-            {rows.map((r) => {
-              const overdue = r.days >= 4 || r.flag === 'red'
+            {rows.map(r => {
               const softCross = tab === 'await_their' || tab === 'await_ours'
               return (
-                <div
-                  key={r.id}
+                <div key={r.id}
                   className={`relative flex items-center justify-between gap-4 rounded-2xl px-4 py-3 border
-                    ${overdue ? 'border-red-400/30 bg-red-500/10' : 'border-white/10 bg-white/5'}`}
-                >
-                  {/* LEFT: avatar + name/handle (слева вплотную) */}
+                    ${overdue(r) ? 'border-red-400/30 bg-red-500/10' : 'border-white/10 bg-white/5'}`}>
+                  {/* LEFT: avatar + name/handle */}
                   <div className="flex items-center gap-3">
                     <div className="avatar-ring-sm"><div className="avatar-ring-sm-inner">
-                      <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm" />
+                      <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
                     </div></div>
                     <div className="leading-5">
                       <div className="font-semibold">{r.name}</div>
@@ -201,19 +252,20 @@ export default function ProfilePage() {
 
                   {/* RIGHT: actions */}
                   <div className="flex items-center gap-2">
-                    <a className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm" href="#">
-                      Open in X
-                    </a>
+                    <a className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm" href="#">Open in X</a>
+
                     {tab === 'mutual' && (
                       <button onClick={() => unfollowFromMutual(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">
                         Unfollow
                       </button>
                     )}
+
                     {tab === 'await_their' && (
                       <button onClick={() => unfollowFromAwaitTheir(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">
                         Unfollow
                       </button>
                     )}
+
                     {tab === 'await_ours' && (
                       <>
                         <button onClick={() => followFromAwaitOurs(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">
@@ -226,15 +278,13 @@ export default function ProfilePage() {
                     )}
                   </div>
 
-                  {/* soft delete cross for two tabs */}
+                  {/* soft delete cross */}
                   {softCross && (
                     <button
                       onClick={() => softRemove(tab as 'await_their' | 'await_ours', r)}
                       className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs"
                       title="Remove from this tab"
-                    >
-                      ×
-                    </button>
+                    >×</button>
                   )}
                 </div>
               )
@@ -245,7 +295,7 @@ export default function ProfilePage() {
         {/* RIGHT CARD */}
         <aside className="card p-5 flex-shrink-0 w-[360px] flex flex-col items-center">
           <div className="avatar-ring-xl"><div className="avatar-ring-xl-inner">
-            <img src={selectedAvatar} alt="selected" className="avatar-xl" />
+            <img src={selectedAvatar} alt="selected" className="avatar-xl"/>
           </div></div>
           <div className="mt-5 text-center">
             <div className="font-semibold text-lg">Selected_user name</div>
