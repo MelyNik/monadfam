@@ -112,21 +112,21 @@ export default function HomePage() {
 
       {/* Tutorial overlay */}
       {showTutorial && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="card max-w-[520px] w-[92%] p-6">
-            <h3 className="text-2xl font-bold mb-2">Quick tutorial</h3>
-            <ol className="list-decimal pl-6 space-y-2 text-white/90">
-              <li>Press <b>Follow</b> to add a person to “Waiting for our follow”.</li>
-              <li>Press <b>Skip</b> to see the next person.</li>
-              <li>Open your <b>Profile</b> to manage lists and statuses.</li>
-            </ol>
-            <div className="mt-5 flex gap-2 justify-end">
-              <button className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15" onClick={() => setShowTutorial(false)}>Close</button>
-              <button className="px-3 py-2 rounded-xl bg-[#7C5CFF] hover:bg-[#9A86FF]" onClick={markTutorialDone}>Got it</button>
-            </div>
-          </div>
-        </div>
-      )}
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+    <div className="w-[92%] max-w-[520px] rounded-2xl border border-white/10 bg-[rgba(10,10,16,0.96)] p-6 shadow-2xl">
+      <h3 className="text-2xl font-bold mb-2">Quick tutorial</h3>
+      <ol className="list-decimal pl-6 space-y-2 text-white/90">
+        <li>Press <b>Follow</b> to add a person to “Waiting for our follow”.</li>
+        <li>Press <b>Skip</b> to see the next person.</li>
+        <li>Open your <b>Profile</b> to manage lists and statuses.</li>
+      </ol>
+      <div className="mt-5 flex gap-2 justify-end">
+        <button className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15" onClick={() => setShowTutorial(false)}>Close</button>
+        <button className="px-3 py-2 rounded-xl bg-[#7C5CFF] hover:bg-[#9A86FF]" onClick={markTutorialDone}>Got it</button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   )
 }
