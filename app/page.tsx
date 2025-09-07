@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { AppState, Row, loadState, saveState, takeNextFromPool, advancePool } from '../lib/state'
+import { AppState, Row, loadState, saveState, takeNextFromPool, advancePool, clone } from '../lib/state'
 
 function RatingBar() {
   return (
@@ -22,7 +22,7 @@ export default function HomePage() {
 
   const candidate: Row | null = useMemo(() => {
     if (!state) return null
-    const s = structuredClone(state)
+    const s = clone(state)
     return takeNextFromPool(s)
   }, [state])
 
@@ -31,7 +31,7 @@ export default function HomePage() {
   const disabledByStatus = state.status.mode !== 'online'
 
   const doSkip = () => {
-    const s = structuredClone(state)
+    const s = clone(state)
     advancePool(s)
     saveState(s)
     setState(s)
@@ -39,7 +39,7 @@ export default function HomePage() {
 
   const doFollow = () => {
     if (!candidate) return
-    const s = structuredClone(state)
+    const s = clone(state)
     // отправляем в «Waiting for our follow»
     s.lists.await_ours = [{ ...candidate, days: 0 }, ...s.lists.await_ours]
     advancePool(s)
@@ -48,7 +48,7 @@ export default function HomePage() {
   }
 
   const markTutorialDone = () => {
-    const s = structuredClone(state)
+    const s = clone(state)
     s.tutorialDone = true
     saveState(s)
     setState(s)

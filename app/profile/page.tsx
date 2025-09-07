@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { AppState, Row, loadState, saveState } from '../../lib/state'
+import { AppState, Row, loadState, saveState, clone } from '../../lib/state'
 
 const yourAvatar     = 'https://unavatar.io/x/your_handle'
 const selectedAvatar = 'https://unavatar.io/x/selected_user'
@@ -11,6 +11,12 @@ export default function ProfilePage(){
   const [state, setState] = useState<AppState | null>(null)
   const [tab, setTab]     = useState<Tab>('mutual')
   const [q, setQ]         = useState('')
+const qNorm = q.toLowerCase().replace(/^@/, '')
+const match = (r: Row) => {
+  const h = (r.handle || '').toLowerCase().replace(/^@/, '')
+  const n = (r.name   || '').toLowerCase()
+  return h.includes(qNorm) || n.includes(qNorm)
+}
 
   // загрузка состояния + тиканье short-таймера
   useEffect(() => {
@@ -19,7 +25,7 @@ export default function ProfilePage(){
     const t = setInterval(() => {
       setState(prev => {
         if (!prev) return prev
-        const ns = structuredClone(prev)
+        const ns = clone(prev)
         if (ns.status.mode === 'short' && ns.status.shortUntil && Date.now() >= ns.status.shortUntil) {
           ns.status.mode = 'online'
           ns.status.shortUntil = undefined
@@ -33,10 +39,7 @@ export default function ProfilePage(){
 
   // если ещё не подгрузилось — ничего не рендерим
   if (!state) return null
-
-  // --- поиск/фильтр
-  const norm  = (s: string) => s.toLowerCase().replace(/^@/, '')
-  const match = (r: Row)    => norm(r.handle).includes(norm(q)) || norm(r.name).includes(norm(q))
+const s = state as AppState
 
   const lists   = state.lists
   const removed = state.removed
@@ -55,7 +58,7 @@ export default function ProfilePage(){
   // ===== действия по вкладкам
   const unfollowFromMutual = (r: Row) => {
     if (!ask()) return
-    const ns = structuredClone(state)
+    const ns = clone(s)
     ns.lists.mutual = ns.lists.mutual.filter(x => x.id !== r.id)
     ns.lists.await_ours = [{ ...r, days: 0 }, ...ns.lists.await_ours]
     write(ns)
@@ -63,13 +66,13 @@ export default function ProfilePage(){
 
   const unfollowFromAwaitTheir = (r: Row) => {
     if (!ask()) return
-    const ns = structuredClone(state)
+    const ns = clone(s)
     ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     write(ns)
   }
 
   const followFromAwaitOurs = (r: Row) => {
-    const ns = structuredClone(state)
+    const ns = clone (state)
     ns.lists.await_ours = ns.lists.await_ours.filter(x => x.id !== r.id)
     ns.lists.mutual     = [{ ...r, days: 0 }, ...ns.lists.mutual]
     write(ns)
@@ -77,7 +80,7 @@ export default function ProfilePage(){
 
   const declineFromAwaitOurs = (r: Row) => {
     if (!ask()) return
-    const ns = structuredClone(state)
+    const ns = clone(s)
     ns.lists.await_ours = ns.lists.await_ours.filter(x => x.id !== r.id)
     write(ns)
   }
@@ -85,7 +88,7 @@ export default function ProfilePage(){
   // мягкое удаление + восстановление
   const softRemove = (from: 'await_their' | 'await_ours', r: Row) => {
     if (!ask()) return
-    const ns = structuredClone(state)
+    const ns = clone(s)
     if (from === 'await_their') ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     if (from === 'await_ours')  ns.lists.await_ours  = ns.lists.await_ours .filter(x => x.id !== r.id)
     ns.removed = [{ from, row: r }, ...ns.removed]
@@ -93,7 +96,7 @@ export default function ProfilePage(){
   }
   const restoreRemoved = () => {
     if (!removed.length) return
-    const ns = structuredClone(state)
+    const ns = clone(s)
     removed.forEach(({ from, row }) => {
       if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
       if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours]
@@ -104,7 +107,7 @@ export default function ProfilePage(){
 
   // ===== статусы
   const toOnline = () => {
-    const ns = structuredClone(state)
+    const ns = clone(s)
     ns.status.mode = 'online'
     ns.status.shortUntil = undefined
     ns.status.longActive = false
@@ -113,7 +116,7 @@ export default function ProfilePage(){
   const activateShort = () => {
     if (state.status.mode === 'short') return
     if (state.status.shortLeft <= 0) { alert('No short absences left this month'); return }
-    const ns = structuredClone(state)
+    const ns = clone(s)
     const TWO_DAYS = 2 * 24 * 60 * 60 * 1000
     ns.status.mode = 'short'
     ns.status.shortLeft -= 1
@@ -121,7 +124,7 @@ export default function ProfilePage(){
     write(ns)
   }
   const toggleLong = () => {
-    const ns = structuredClone(state)
+    const ns = clone(s)
     if (ns.status.mode === 'long') {
       ns.status.mode = 'online'
       ns.status.longActive = false
@@ -240,7 +243,15 @@ export default function ProfilePage(){
 
                   {/* RIGHT: actions */}
                   <div className="flex items-center gap-2">
-                    <a className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm" href="#">Open in X</a>
+                    <a
+  className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+  href={`https://x.com/${r.handle.replace(/^@/, '')}`}
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  Open in X
+</a>
+
 
                     {tab === 'mutual' && (
                       <button onClick={() => unfollowFromMutual(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">
