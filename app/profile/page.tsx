@@ -8,7 +8,7 @@ const selectedAvatar = 'https://unavatar.io/x/selected_user'
 type Tab = 'mutual' | 'await_their' | 'await_ours'
 
 export default function ProfilePage(){
-  const [state, setState] = useState<AppState | null>(null)
+  const [state, setState] = useState<AppState>(() => loadState())
   const [tab, setTab]     = useState<Tab>('mutual')
   const [q, setQ]         = useState('')
 const qNorm = q.toLowerCase().replace(/^@/, '')
@@ -20,31 +20,20 @@ const match = (r: Row) => {
 
   // загрузка состояния + тиканье short-таймера
   useEffect(() => {
-  const s0 = loadState()
-  setState(s0)
-
   const t = setInterval(() => {
     setState(prev => {
-      if (!prev) return prev
-      // Меняем состояние только в момент истечения short-таймера
-      if (prev.status.mode === 'short' && prev.status.shortUntil && Date.now() >= prev.status.shortUntil) {
-        const ns = clone(prev)
+      const ns = clone(prev)
+      if (ns.status.mode === 'short' && ns.status.shortUntil && Date.now() >= ns.status.shortUntil) {
         ns.status.mode = 'online'
         ns.status.shortUntil = undefined
         saveState(ns)
-        return ns
       }
-      return prev // иначе не трогаем
+      return ns
     })
   }, 1000)
-
   return () => clearInterval(t)
 }, [])
 
-
-  // если ещё не подгрузилось — ничего не рендерим
-  if (!state) return null
-const s = state as AppState
 
   const lists   = state.lists
   const removed = state.removed
@@ -63,7 +52,7 @@ const s = state as AppState
   // ===== действия по вкладкам
   const unfollowFromMutual = (r: Row) => {
     if (!ask()) return
-    const ns = clone(s)
+    const ns = clone(state)
     ns.lists.mutual = ns.lists.mutual.filter(x => x.id !== r.id)
     ns.lists.await_ours = [{ ...r, days: 0 }, ...ns.lists.await_ours]
     write(ns)
@@ -71,13 +60,13 @@ const s = state as AppState
 
   const unfollowFromAwaitTheir = (r: Row) => {
     if (!ask()) return
-    const ns = clone(s)
+    const ns = clone(state)
     ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     write(ns)
   }
 
   const followFromAwaitOurs = (r: Row) => {
-    const ns = clone(s)
+    const ns = clone(state)
     ns.lists.await_ours = ns.lists.await_ours.filter(x => x.id !== r.id)
     ns.lists.mutual     = [{ ...r, days: 0 }, ...ns.lists.mutual]
     write(ns)
@@ -85,7 +74,7 @@ const s = state as AppState
 
   const declineFromAwaitOurs = (r: Row) => {
     if (!ask()) return
-    const ns = clone(s)
+    const ns = clone(state)
     ns.lists.await_ours = ns.lists.await_ours.filter(x => x.id !== r.id)
     write(ns)
   }
@@ -93,7 +82,7 @@ const s = state as AppState
   // мягкое удаление + восстановление
   const softRemove = (from: 'await_their' | 'await_ours', r: Row) => {
     if (!ask()) return
-    const ns = clone(s)
+    const ns = clone(state)
     if (from === 'await_their') ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     if (from === 'await_ours')  ns.lists.await_ours  = ns.lists.await_ours .filter(x => x.id !== r.id)
     ns.removed = [{ from, row: r }, ...ns.removed]
@@ -101,7 +90,7 @@ const s = state as AppState
   }
   const restoreRemoved = () => {
     if (!removed.length) return
-    const ns = clone(s)
+    const ns = clone(state)
     removed.forEach(({ from, row }) => {
       if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
       if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours]
@@ -112,7 +101,7 @@ const s = state as AppState
 
   // ===== статусы
   const toOnline = () => {
-    const ns = clone(s)
+    const ns = clone(state)
     ns.status.mode = 'online'
     ns.status.shortUntil = undefined
     ns.status.longActive = false
@@ -121,7 +110,7 @@ const s = state as AppState
   const activateShort = () => {
     if (state.status.mode === 'short') return
     if (state.status.shortLeft <= 0) { alert('No short absences left this month'); return }
-    const ns = clone(s)
+    const ns = clone(state)
     const TWO_DAYS = 2 * 24 * 60 * 60 * 1000
     ns.status.mode = 'short'
     ns.status.shortLeft -= 1
@@ -129,7 +118,7 @@ const s = state as AppState
     write(ns)
   }
   const toggleLong = () => {
-    const ns = clone(s)
+    const ns = clone(state)
     if (ns.status.mode === 'long') {
       ns.status.mode = 'online'
       ns.status.longActive = false
