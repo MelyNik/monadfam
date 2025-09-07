@@ -58,7 +58,7 @@ export default function ProfilePage(){
   }
 
   return (
-    <div className="min-h-screen max-w-7xl mx-auto px-6 py-8 text-white">
+    <div className="min-h-screen max-w-[1600px] mx-auto px-8 py-8 text-white">
       <h1 className="text-3xl font-bold mb-6">Profile</h1>
 
       {/* statuses */}
@@ -87,7 +87,7 @@ export default function ProfilePage(){
       {/* LAYOUT: flex with fixed side columns (340px) and wide center */}
       <div className="flex gap-8 items-start">
         {/* LEFT FIXED CARD */}
-        <aside className="card p-5 flex-shrink-0 w-[340px] flex flex-col items-center">
+        <aside className="card p-5 flex-shrink-0 w-[360px] flex flex-col items-center">
           <div className="avatar-ring-xl"><div className="avatar-ring-xl-inner">
             <img src={yourAvatar} alt="you" className="avatar-xl"/>
           </div></div>
@@ -134,7 +134,7 @@ export default function ProfilePage(){
         </main>
 
         {/* RIGHT FIXED CARD */}
-        <aside className="card p-5 flex-shrink-0 w-[340px] flex flex-col items-center">
+        <aside className="card p-5 flex-shrink-0 w-[360px] flex flex-col items-center">
           <div className="avatar-ring-xl"><div className="avatar-ring-xl-inner">
             <img src={selectedAvatar} alt="selected" className="avatar-xl"/>
           </div></div>
