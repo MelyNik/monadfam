@@ -1,22 +1,22 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
+/* === Avatar gradient rings === */
+/* Можно регулировать размеры через переменные: */
 :root {
-  --bg-start: #0b0b14;
-  --bg-end: #0e0b18;
-  --card: rgba(255,255,255,0.06);
-  --border: rgba(255,255,255,0.12);
-  --accent: #7C5CFF;
-  --accent-hover: #9A86FF;
-  --muted: rgba(255,255,255,0.7);
+  --avatar-xl: 260px;        /* большой аватар слева/справа — не меньше макета */
+  --ring-xl: 3px;            /* толщина цветного кольца у большого аватара */
+  --ring-xl-inner: 2px;      /* тонкая «светлая» кайма под кольцом */
+
+  --avatar-sm: 44px;         /* маленький аватар в строках */
+  --ring-sm: 2px;            /* кольцо у маленького аватара */
+  --ring-sm-inner: 1.5px;
+  --ring-colors: conic-gradient(#22c55e, #eab308, #ef4444); /* зел→жёлт→красн */
 }
 
-body { color:white; background:linear-gradient(135deg,var(--bg-start),var(--bg-end)); }
+/* Большой аватар с тонким кольцом */
+.avatar-ring-xl { background: var(--ring-colors); padding: var(--ring-xl); border-radius: 9999px; display: inline-grid; }
+.avatar-ring-xl-inner { background: #0f0f15; padding: var(--ring-xl-inner); border-radius: 9999px; }
+.avatar-xl { width: var(--avatar-xl); height: var(--avatar-xl); border-radius: 9999px; object-fit: cover; background:#1a1a1f; border:2px solid #fff; }
 
-.card { background:var(--card); border:1px solid var(--border); border-radius:1.25rem; }
-.input { background:rgba(255,255,255,0.08); border:1px solid var(--border); border-radius:0.75rem; padding:0.6rem 0.8rem; }
-.btn { border-radius:0.9rem; padding:0.6rem 1rem; }
-
-/* Helpers for rating ring */
-.ring-grad { background: conic-gradient(#22c55e, #eab308, #ef4444); } /* green→yellow→red */
+/* Маленький аватар в строках */
+.avatar-ring-sm { background: var(--ring-colors); padding: var(--ring-sm); border-radius: 9999px; display: inline-grid; }
+.avatar-ring-sm-inner { background: #0f0f15; padding: var(--ring-sm-inner); border-radius: 9999px; }
+.avatar-sm { width: var(--avatar-sm); height: var(--avatar-sm); border-radius: 9999px; object-fit: cover; background:#1a1a1f; border:2px solid #fff; }
