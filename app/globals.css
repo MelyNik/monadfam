@@ -1,4 +1,1 @@
-/* GEOMETRY FIX: increase big avatar & keep thin ring */
-:root {
-  --avatar-xl: 300px; /* was 260px */
-}
+:root { --avatar-xl: 300px; }

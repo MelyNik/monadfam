@@ -1,3 +1,4 @@
+
 'use client'
 import { useMemo, useState } from 'react'
 
@@ -48,6 +49,15 @@ export default function ProfilePage(){
   const declineFromAwaitOurs=(r:Row)=> setAwaitOurs(p=>p.filter(x=>x.id!==r.id))
   const unfollowFromAwaitTheir=(r:Row)=> setAwaitTheir(p=>p.filter(x=>x.id!==r.id))
 
+  const tabBtn = (kind:Tab, label:string, count:number) => {
+    const active = tab===kind ? 'bg-white/10' : ''
+    return (
+      <button onClick={()=>setTab(kind)} className={`px-4 py-3 rounded-xl font-medium ${active}`}>
+        {label} <span className="text-white/60">({count})</span>
+      </button>
+    )
+  }
+
   return (
     <div className="min-h-screen max-w-7xl mx-auto px-6 py-8 text-white">
       <h1 className="text-3xl font-bold mb-6">Profile</h1>
@@ -66,15 +76,9 @@ export default function ProfilePage(){
       {/* tabs + search */}
       <div className="card p-2 mb-4">
         <div className="grid md:grid-cols-3 gap-2">
-          <button onClick={()=>setTab('mutual')} className={\`px-4 py-3 rounded-xl font-medium \${tab==='mutual'?'bg-white/10':''}\`}>
-            Following each other <span className="text-white/60">({counts.mutual})</span>
-          </button>
-          <button onClick={()=>setTab('await_their')} className={\`px-4 py-3 rounded-xl font-medium \${tab==='await_their'?'bg-white/10':''}\`}>
-            Awaiting follow-back <span className="text-white/60">({counts.await_their})</span>
-          </button>
-          <button onClick={()=>setTab('await_ours')} className={\`px-4 py-3 rounded-xl font-medium \${tab==='await_ours'?'bg-white/10':''}\`}>
-            Waiting for our follow <span className="text-white/60">({counts.await_ours})</span>
-          </button>
+          {tabBtn('mutual','Following each other',counts.mutual)}
+          {tabBtn('await_their','Awaiting follow-back',counts.await_their)}
+          {tabBtn('await_ours','Waiting for our follow',counts.await_ours)}
         </div>
         <div className="mt-3">
           <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search by @handle or name" className="input w-full"/>
@@ -100,14 +104,14 @@ export default function ProfilePage(){
           </div>
         </aside>
 
-        {/* CENTER rows: long lines; name & handle centered */}
+        {/* CENTER rows */}
         <main className="">
           <div className="space-y-4">
             {rows.length===0 && <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r=>{
               const overdue = r.days>=4
               return (
-                <div key={r.id} className={\`grid grid-cols-[auto_1fr_auto] items-center gap-4 rounded-2xl px-4 py-3 border \${overdue?'border-red-400/30 bg-red-500/10':'border-white/10 bg-white/5'}\`}>
+                <div key={r.id} className={`grid grid-cols-[auto_1fr_auto] items-center gap-4 rounded-2xl px-4 py-3 border ${overdue?'border-red-400/30 bg-red-500/10':'border-white/10 bg-white/5'}`}>
                   {/* avatar */}
                   <div className="justify-self-start">
                     <div className="avatar-ring-sm"><div className="avatar-ring-sm-inner">
@@ -154,3 +158,4 @@ export default function ProfilePage(){
     </div>
   )
 }
+
