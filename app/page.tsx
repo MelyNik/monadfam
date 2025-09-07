@@ -7,22 +7,25 @@ type SlideUser = {
   avatarUrl?: string | null
 }
 
-/**
- * ВРЕМЕННО ДЛЯ ДЕМО:
+/** ВРЕМЕННО для демо:
  * 1) Если есть avatarUrl — используем его.
- * 2) Если есть только @handle — можно взять аватар через unavatar (неофициально).
- *    Для продакшена заменим на данные из X API после логина (users.read).
+ * 2) Если есть только @handle — пробуем взять картинку через unavatar (неофициально).
+ *    В продакшене заменим на X API (users.read → /2/users/me) после логина.
  */
 function getAvatarSrc(u: SlideUser) {
   if (u.avatarUrl) return u.avatarUrl
   const h = u.handle.replace('@', '')
-  return `https://unavatar.io/x/${h}` // временно! в проде будет X API
+  return `https://unavatar.io/x/${h}` // временно; позже будет X API
 }
 
 export default function Page() {
-  // ДЕМО-пользователь карточки (позже подменим данными из бэкенда/X после авторизации)
+  // ДЕМО-данные карточки (после авторизации подменим реальными)
   const user: SlideUser = useMemo(
-    () => ({ name: 'Nik', handle: '@user1' }),
+    () => ({
+      name: 'Nik',
+      handle: '@user1',
+      // avatarUrl: 'https://...' // можно проставить, если хочешь жёстко
+    }),
     []
   )
 
@@ -30,7 +33,7 @@ export default function Page() {
 
   return (
     <div className="min-h-screen w-full text-white">
-      {/* Шапка: без разделительной полосы; Profile по центру */}
+      {/* Шапка как была: без разделителя, Profile по центру */}
       <header className="sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-4 py-4 grid grid-cols-3 items-center">
           <div className="flex items-center gap-2 text-white/80">
@@ -38,10 +41,7 @@ export default function Page() {
             <span className="font-semibold tracking-wide">Monad</span>
           </div>
           <div className="flex justify-center">
-            <a
-              href="/profile"
-              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 transition"
-            >
+            <a href="/profile" className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 transition">
               Profile
             </a>
           </div>
@@ -68,13 +68,12 @@ export default function Page() {
           </div>
         )}
 
-        {/* После Start — одна вертикальная «карта»: аватар → имя → логин → рейтинговая полоса */}
+        {/* После Start — одна вертикальная «карта» с аватаром → имя → логин → полоска */}
         {started && (
           <section className="mt-10 flex flex-col items-center gap-4">
             <article className="card w-full max-w-sm overflow-hidden flex flex-col items-center">
-              {/* Аватар из X (круг, без кольца рейтинга) */}
+              {/* Аватар из X (круг, БЕЗ рейтингового кольца) */}
               <div className="w-full flex-1 flex items-center justify-center p-8">
-                {/* В продакшене src возьмём из X API (profile_image_url) */}
                 <img
                   src={getAvatarSrc(user)}
                   alt={`${user.handle} avatar`}
@@ -89,51 +88,38 @@ export default function Page() {
                 <div className="text-sm text-white/70">{user.handle}</div>
               </div>
 
-              {/* Рейтинговая полоса ТОЛЬКО под карточкой */}
+              {/* РЕЙТИНГОВАЯ ПОЛОСА только под карточкой */}
               <div className="h-1.5 w-full bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
             </article>
 
-            {/* Кнопки ниже карточки */}
+            {/* Кнопки под картой */}
             <div className="flex gap-3">
-              <button className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
-                Skip
-              </button>
-              <button
-                className="px-4 py-2 rounded-xl"
-                style={{ background: 'var(--accent)' }}
-              >
+              <button className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">Skip</button>
+              <button className="px-4 py-2 rounded-xl" style={{ background: 'var(--accent)' }}>
                 Follow
               </button>
             </div>
           </section>
         )}
 
-        {/* FAQ + кнопка вызова обучения (как просил — рядом) */}
+        {/* FAQ + Show tutorial — как было */}
         <section className="mt-14 mb-24 max-w-3xl mx-auto">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">FAQ</h2>
-            <button className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
-              Show tutorial
-            </button>
+            <button className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">Show tutorial</button>
           </div>
           <div className="space-y-2">
             <details className="card p-4">
               <summary className="cursor-pointer font-medium">How do I start?</summary>
-              <p className="mt-2 text-white/70">
-                Sign in with Discord and X (coming next), click Start, then choose people.
-              </p>
+              <p className="mt-2 text-white/70">Sign in with Discord and X (coming next), click Start, then choose people.</p>
             </details>
             <details className="card p-4">
               <summary className="cursor-pointer font-medium">What does “mutual” mean?</summary>
-              <p className="mt-2 text-white/70">
-                You follow each other. Until then, the profile is marked “awaiting follow-back”.
-              </p>
+              <p className="mt-2 text-white/70">You follow each other. Until then, the profile is marked “awaiting follow-back”.</p>
             </details>
             <details className="card p-4">
               <summary className="cursor-pointer font-medium">How does the rating work?</summary>
-              <p className="mt-2 text-white/70">
-                Every 4 days you vote: keeps the pact or not. The color bar changes.
-              </p>
+              <p className="mt-2 text-white/70">Every 4 days you vote: keeps the pact or not. The color bar changes.</p>
             </details>
           </div>
         </section>
