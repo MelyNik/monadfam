@@ -20,22 +20,27 @@ const match = (r: Row) => {
 
   // загрузка состояния + тиканье short-таймера
   useEffect(() => {
-    const s = loadState()
-    setState(s)
-    const t = setInterval(() => {
-      setState(prev => {
-        if (!prev) return prev
+  const s0 = loadState()
+  setState(s0)
+
+  const t = setInterval(() => {
+    setState(prev => {
+      if (!prev) return prev
+      // Меняем состояние только в момент истечения short-таймера
+      if (prev.status.mode === 'short' && prev.status.shortUntil && Date.now() >= prev.status.shortUntil) {
         const ns = clone(prev)
-        if (ns.status.mode === 'short' && ns.status.shortUntil && Date.now() >= ns.status.shortUntil) {
-          ns.status.mode = 'online'
-          ns.status.shortUntil = undefined
-          saveState(ns)
-        }
+        ns.status.mode = 'online'
+        ns.status.shortUntil = undefined
+        saveState(ns)
         return ns
-      })
-    }, 1000)
-    return () => clearInterval(t)
-  }, [])
+      }
+      return prev // иначе не трогаем
+    })
+  }, 1000)
+
+  return () => clearInterval(t)
+}, [])
+
 
   // если ещё не подгрузилось — ничего не рендерим
   if (!state) return null
