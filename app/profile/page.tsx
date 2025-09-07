@@ -12,7 +12,7 @@ export default function ProfilePage(){
   const [tab, setTab]     = useState<Tab>('mutual')
   const [q, setQ]         = useState('')
 
-  // tick для обратного таймера short
+  // загрузка состояния + тиканье short-таймера
   useEffect(() => {
     const s = loadState()
     setState(s)
@@ -20,7 +20,6 @@ export default function ProfilePage(){
       setState(prev => {
         if (!prev) return prev
         const ns = structuredClone(prev)
-        // авто-возврат из short, если истёк
         if (ns.status.mode === 'short' && ns.status.shortUntil && Date.now() >= ns.status.shortUntil) {
           ns.status.mode = 'online'
           ns.status.shortUntil = undefined
@@ -32,9 +31,10 @@ export default function ProfilePage(){
     return () => clearInterval(t)
   }, [])
 
+  // если ещё не подгрузилось — ничего не рендерим
   if (!state) return null
 
-  // поиск
+  // --- поиск/фильтр
   const norm  = (s: string) => s.toLowerCase().replace(/^@/, '')
   const match = (r: Row)    => norm(r.handle).includes(norm(q)) || norm(r.name).includes(norm(q))
 
@@ -48,20 +48,21 @@ export default function ProfilePage(){
 
   const counts = { mutual: lists.mutual.length, await_their: lists.await_their.length, await_ours: lists.await_ours.length }
 
-  // ===== действия со списками (все пишем в localStorage) =====
+  // ===== helpers для записи состояния
   const write = (ns: AppState) => { saveState(ns); setState(ns) }
+  const ask = (msg = 'Confirm your choice?') => window.confirm(msg)
 
+  // ===== действия по вкладкам
   const unfollowFromMutual = (r: Row) => {
-    if (!confirm()) return
+    if (!ask()) return
     const ns = structuredClone(state)
     ns.lists.mutual = ns.lists.mutual.filter(x => x.id !== r.id)
-    // по твоему правилу — просто переносим к «Waiting for our follow», days=0
     ns.lists.await_ours = [{ ...r, days: 0 }, ...ns.lists.await_ours]
     write(ns)
   }
 
   const unfollowFromAwaitTheir = (r: Row) => {
-    if (!confirm()) return
+    if (!ask()) return
     const ns = structuredClone(state)
     ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     write(ns)
@@ -75,22 +76,21 @@ export default function ProfilePage(){
   }
 
   const declineFromAwaitOurs = (r: Row) => {
-    if (!confirm()) return
+    if (!ask()) return
     const ns = structuredClone(state)
     ns.lists.await_ours = ns.lists.await_ours.filter(x => x.id !== r.id)
     write(ns)
   }
 
-  // мягкое удаление крестиком
+  // мягкое удаление + восстановление
   const softRemove = (from: 'await_their' | 'await_ours', r: Row) => {
-    if (!confirm()) return
+    if (!ask()) return
     const ns = structuredClone(state)
     if (from === 'await_their') ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     if (from === 'await_ours')  ns.lists.await_ours  = ns.lists.await_ours .filter(x => x.id !== r.id)
     ns.removed = [{ from, row: r }, ...ns.removed]
     write(ns)
   }
-
   const restoreRemoved = () => {
     if (!removed.length) return
     const ns = structuredClone(state)
@@ -102,7 +102,7 @@ export default function ProfilePage(){
     write(ns)
   }
 
-  // ===== статусы =====
+  // ===== статусы
   const toOnline = () => {
     const ns = structuredClone(state)
     ns.status.mode = 'online'
@@ -110,24 +110,19 @@ export default function ProfilePage(){
     ns.status.longActive = false
     write(ns)
   }
-
-  // Short: включаем на 2 дня (MVP), счётчик / месяц, таймер и зелёный фон
   const activateShort = () => {
+    if (state.status.mode === 'short') return
+    if (state.status.shortLeft <= 0) { alert('No short absences left this month'); return }
     const ns = structuredClone(state)
-    if (ns.status.mode === 'short') return // уже включен
-    if (ns.status.shortLeft <= 0) { alert('No short absences left this month'); return }
     const TWO_DAYS = 2 * 24 * 60 * 60 * 1000
     ns.status.mode = 'short'
     ns.status.shortLeft -= 1
     ns.status.shortUntil = Date.now() + TWO_DAYS
     write(ns)
   }
-
-  // Long: тумблер с красным фоном; 1 раз в месяц
   const toggleLong = () => {
     const ns = structuredClone(state)
     if (ns.status.mode === 'long') {
-      // Stop
       ns.status.mode = 'online'
       ns.status.longActive = false
       write(ns)
@@ -141,9 +136,9 @@ export default function ProfilePage(){
     write(ns)
   }
 
-  // формат обратного таймера
+  // безопасный обратный таймер (если не short — пусто)
   const shortCountdown = useMemo(() => {
-    if (state.status.mode !== 'short' || !state.status.shortUntil) return ''
+    if (!state || state.status.mode !== 'short' || !state.status.shortUntil) return ''
     const left = Math.max(0, state.status.shortUntil - Date.now())
     const sec  = Math.floor(left / 1000)
     const h = Math.floor(sec / 3600).toString().padStart(2, '0')
@@ -160,9 +155,7 @@ export default function ProfilePage(){
       </button>
     )
   }
-
-  const overdue = (r: Row) =>
-    (tab === 'await_their' || tab === 'await_ours') && r.days >= 4
+  const overdue = (r: Row) => (tab === 'await_their' || tab === 'await_ours') && r.days >= 4
 
   return (
     <div className="min-h-screen max-w-[1600px] mx-auto px-8 py-8 text-white">
@@ -170,16 +163,11 @@ export default function ProfilePage(){
 
       {/* statuses + restore */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
-        <button
-          className="px-4 py-2 rounded-xl bg-white/15"
-          onClick={toOnline}
-        >
-          Online
-        </button>
+        <button className="px-4 py-2 rounded-xl bg-white/15" onClick={toOnline}>Online</button>
 
         <button
           onClick={activateShort}
-          className={`px-4 py-2 rounded-xl ${state.status.mode === 'short' ? 'bg-green-600/30' : 'bg-white/10'} `}
+          className={`px-4 py-2 rounded-xl ${state.status.mode === 'short' ? 'bg-green-600/30' : 'bg-white/10'}`}
           title="Short absence: up to 2 days"
         >
           {state.status.mode === 'short'
@@ -189,7 +177,7 @@ export default function ProfilePage(){
 
         <button
           onClick={toggleLong}
-          className={`px-4 py-2 rounded-xl ${state.status.mode === 'long' ? 'bg-red-600/30' : 'bg-white/10'} `}
+          className={`px-4 py-2 rounded-xl ${state.status.mode === 'long' ? 'bg-red-600/30' : 'bg-white/10'}`}
           title="Long absence: one per month"
         >
           {state.status.mode === 'long' ? 'Stop' : `Long absence · ${state.status.longLeft} left`}
