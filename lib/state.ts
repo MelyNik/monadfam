@@ -6,19 +6,27 @@ export type Row = {
   avatarUrl?: string
   days: number
 }
+
 export type Lists = { mutual: Row[]; await_their: Row[]; await_ours: Row[] }
 export type Removed = { from: 'await_their' | 'await_ours'; row: Row }[]
+
 export type StatusMode = 'online' | 'short' | 'long'
 export type Status = {
   mode: StatusMode
+
+  // Short: попытки восстанавливаются в ПЕРВЫЙ день нового календарного месяца
   shortLeft: number
-  shortUntil?: number
-  shortMonthStart?: number
-  longLeft: number
+  shortUntil?: number               // когда закончится активная short-пауза (2 суток)
+  shortMonthStart?: number          // отметка месяца, когда был последний ресет short (UTC-начало месяца)
+
+  // Long: попытка восстанавливается через 30 дней ПОСЛЕ выхода из long
+  longLeft: number                  // 0 или 1
   longActive?: boolean
   longUsedAt?: number
-  longMonthStart?: number
+  longMonthStart?: number           // оставлено для совместимости старых данных
+  longResetAt?: number              // когда можно снова получить 1 попытку long
 }
+
 export type AppState = {
   lists: Lists
   removed: Removed
@@ -57,6 +65,19 @@ const seedAwaitOurs: Row[] = [
   { id: 6, name: 'name', handle: '@frank', days: 6, avatarUrl: 'https://unavatar.io/x/frank' },
 ]
 
+// ===== helpers для календарного месяца (UTC)
+function startOfMonthUTC(ts: number) {
+  const d = new Date(ts)
+  const y = d.getUTCFullYear(), m = d.getUTCMonth()
+  return Date.UTC(y, m, 1, 0, 0, 0, 0)
+}
+function isNewCalendarMonth(prev?: number) {
+  const now = Date.now()
+  const prevMonth = startOfMonthUTC(prev ?? now)
+  const nowMonth  = startOfMonthUTC(now)
+  return nowMonth !== prevMonth
+}
+
 export function defaultState(): AppState {
   const now = Date.now()
   return {
@@ -65,9 +86,10 @@ export function defaultState(): AppState {
     status: {
       mode: 'online',
       shortLeft: 4,
-      shortMonthStart: now,
+      shortMonthStart: startOfMonthUTC(now),
       longLeft: 1,
-      longMonthStart: now,
+      longMonthStart: now,    // не используется для ресета, оставлено для совместимости
+      longResetAt: undefined,
     },
     tutorialDone: false,
     homePool: demoUsers,
@@ -92,19 +114,27 @@ function sanitizeLists(x: any): Lists {
     await_ours:   Array.isArray(x?.await_ours)   ? x.await_ours.map(sanitizeRow)   : (Array.isArray(x?.awaitOurs)  ? x.awaitOurs.map(sanitizeRow)  : []),
   }
 }
-function monthPassed(since?: number) {
-  if (!since) return true
-  const MS30 = 30 * 24 * 60 * 60 * 1000
-  return Date.now() - since > MS30
-}
+
 function normalizeStatus(st: Status): Status {
-  const now = Date.now()
-  const ns = { ...st }
-  if (monthPassed(ns.shortMonthStart)) { ns.shortMonthStart = now; ns.shortLeft = 4 }
-  if (monthPassed(ns.longMonthStart))  { ns.longMonthStart  = now; ns.longLeft  = 1 }
-  if (ns.mode === 'short' && ns.shortUntil && Date.now() >= ns.shortUntil) {
-    ns.mode = 'online'; ns.shortUntil = undefined
+  const ns: Status = { ...st }
+
+  // SHORT: если начался новый календарный месяц — вернуть 4 попытки
+  if (isNewCalendarMonth(ns.shortMonthStart)) {
+    ns.shortMonthStart = startOfMonthUTC(Date.now())
+    ns.shortLeft = 4
   }
+  // если активная short-пауза истекла — выйти в online
+  if (ns.mode === 'short' && ns.shortUntil && Date.now() >= ns.shortUntil) {
+    ns.mode = 'online'
+    ns.shortUntil = undefined
+  }
+
+  // LONG: если попыток нет, но пришло время ресета — вернуть 1 попытку
+  if (ns.longLeft <= 0 && ns.longResetAt && Date.now() >= ns.longResetAt) {
+    ns.longLeft = 1
+    ns.longResetAt = undefined
+  }
+
   return ns
 }
 

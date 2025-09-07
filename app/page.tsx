@@ -38,14 +38,15 @@ export default function HomePage() {
   }
 
   const doFollow = () => {
-    if (!candidate) return
-    const s = clone(state)
-    // отправляем в «Waiting for our follow»
-    s.lists.await_ours = [{ ...candidate, days: 0 }, ...s.lists.await_ours]
-    advancePool(s)
-    saveState(s)
-    setState(s)
-  }
+  if (!candidate) return
+  const s = clone(state)
+  // мы подписались → ждём их ответки
+  s.lists.await_their = [{ ...candidate, days: 0 }, ...s.lists.await_their]
+  advancePool(s)
+  saveState(s)
+  setState(s)
+}
+
 
   const markTutorialDone = () => {
     const s = clone(state)
