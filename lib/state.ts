@@ -17,7 +17,7 @@ export type Status = {
   // Short: попытки восстанавливаются в ПЕРВЫЙ день нового календарного месяца
   shortLeft: number
   shortUntil?: number               // когда закончится активная short-пауза (2 суток)
-  shortMonthStart?: number          // отметка месяца, когда был последний ресет short (UTC-начало месяца)
+  shortMonthStart?: number          // UTC-начало месяца, когда был последний ресет short
 
   // Long: попытка восстанавливается через 30 дней ПОСЛЕ выхода из long
   longLeft: number                  // 0 или 1
@@ -72,9 +72,8 @@ function startOfMonthUTC(ts: number) {
   return Date.UTC(y, m, 1, 0, 0, 0, 0)
 }
 function isNewCalendarMonth(prev?: number) {
-  const now = Date.now()
-  const prevMonth = startOfMonthUTC(prev ?? now)
-  const nowMonth  = startOfMonthUTC(now)
+  const nowMonth  = startOfMonthUTC(Date.now())
+  const prevMonth = startOfMonthUTC(prev ?? Date.now())
   return nowMonth !== prevMonth
 }
 
@@ -88,7 +87,7 @@ export function defaultState(): AppState {
       shortLeft: 4,
       shortMonthStart: startOfMonthUTC(now),
       longLeft: 1,
-      longMonthStart: now,    // не используется для ресета, оставлено для совместимости
+      longMonthStart: now,      // не используем для ресета, оставлено для совместимости
       longResetAt: undefined,
     },
     tutorialDone: false,
@@ -118,18 +117,18 @@ function sanitizeLists(x: any): Lists {
 function normalizeStatus(st: Status): Status {
   const ns: Status = { ...st }
 
-  // SHORT: если начался новый календарный месяц — вернуть 4 попытки
+  // SHORT: первый день нового календарного месяца → вернуть 4 попытки
   if (isNewCalendarMonth(ns.shortMonthStart)) {
     ns.shortMonthStart = startOfMonthUTC(Date.now())
     ns.shortLeft = 4
   }
-  // если активная short-пауза истекла — выйти в online
+  // истёк активный short → выйти в online
   if (ns.mode === 'short' && ns.shortUntil && Date.now() >= ns.shortUntil) {
     ns.mode = 'online'
     ns.shortUntil = undefined
   }
 
-  // LONG: если попыток нет, но пришло время ресета — вернуть 1 попытку
+  // LONG: если попыток нет и пришло время ресета → вернуть 1 попытку
   if (ns.longLeft <= 0 && ns.longResetAt && Date.now() >= ns.longResetAt) {
     ns.longLeft = 1
     ns.longResetAt = undefined

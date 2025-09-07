@@ -2,6 +2,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AppState, Row, loadState, saveState, clone } from '../../lib/state'
 
+const MS30D = 30 * 24 * 60 * 60 * 1000
+
+function fmtLeft(ms: number) {
+  const sec = Math.max(0, Math.floor(ms / 1000))
+  const d = Math.floor(sec / 86400)
+  const h = Math.floor((sec % 86400) / 3600).toString().padStart(2,'0')
+  const m = Math.floor((sec % 3600) / 60).toString().padStart(2,'0')
+  const s = Math.floor(sec % 60).toString().padStart(2,'0')
+  return d > 0 ? `${d}d ${h}h ${m}m` : `${h}:${m}:${s}`
+}
+
+function nextMonthStartUTC() {
+  const now = new Date()
+  const y = now.getUTCFullYear(), m = now.getUTCMonth()
+  return Date.UTC(y, m + 1, 1, 0, 0, 0, 0)
+}
+
+
 const yourAvatar     = 'https://unavatar.io/x/your_handle'
 const selectedAvatar = 'https://unavatar.io/x/selected_user'
 
@@ -23,16 +41,43 @@ const match = (r: Row) => {
   const t = setInterval(() => {
     setState(prev => {
       const ns = clone(prev)
-      if (ns.status.mode === 'short' && ns.status.shortUntil && Date.now() >= ns.status.shortUntil) {
+      let changed = false
+      const now = Date.now()
+
+      // 1) Short истёк → выйти в online
+      if (ns.status.mode === 'short' && ns.status.shortUntil && now >= ns.status.shortUntil) {
         ns.status.mode = 'online'
         ns.status.shortUntil = undefined
-        saveState(ns)
+        changed = true
       }
-      return ns
+
+      // 2) Short попытки восстановить в первый день НОВОГО календарного месяца
+      //    (когда попыток нет и наступило nextMonthStartUTC)
+      if (ns.status.shortLeft <= 0) {
+        const next = nextMonthStartUTC()
+        if (now >= next) {
+          ns.status.shortLeft = 4
+          // фиксируем месяц, чтобы не восстанавливать повторно
+          ns.status.shortMonthStart = next
+          changed = true
+        }
+      }
+
+      // 3) Long восстановить через 30 дней после выхода из long (longResetAt)
+      if (ns.status.longLeft <= 0 && ns.status.longResetAt && now >= ns.status.longResetAt) {
+        ns.status.longLeft = 1
+        ns.status.longResetAt = undefined
+        changed = true
+      }
+
+      if (changed) saveState(ns)
+      return changed ? ns : prev
     })
   }, 1000)
+
   return () => clearInterval(t)
 }, [])
+
 
 
   const lists   = state.lists
@@ -100,38 +145,57 @@ const match = (r: Row) => {
   }
 
   // ===== статусы
-  const toOnline = () => {
-    const ns = clone(state)
-    ns.status.mode = 'online'
-    ns.status.shortUntil = undefined
+  // ===== статусы
+const toOnline = () => {
+  const ns = clone(state)
+  if (ns.status.mode === 'long') {
+    // Выход из long → запустить 30-дневный таймер восстановления
     ns.status.longActive = false
-    write(ns)
+    ns.status.longResetAt = Date.now() + MS30D
   }
-  const activateShort = () => {
-    if (state.status.mode === 'short') return
-    if (state.status.shortLeft <= 0) { alert('No short absences left this month'); return }
-    const ns = clone(state)
-    const TWO_DAYS = 2 * 24 * 60 * 60 * 1000
-    ns.status.mode = 'short'
-    ns.status.shortLeft -= 1
-    ns.status.shortUntil = Date.now() + TWO_DAYS
-    write(ns)
+  ns.status.mode = 'online'
+  ns.status.shortUntil = undefined
+  write(ns)
+}
+
+const activateShort = () => {
+  const ns = clone(state)
+  // если были в long и переключаемся в short — это тоже "выход" из long
+  if (ns.status.mode === 'long') {
+    ns.status.longActive = false
+    ns.status.longResetAt = Date.now() + MS30D
   }
-  const toggleLong = () => {
-    const ns = clone(state)
-    if (ns.status.mode === 'long') {
-      ns.status.mode = 'online'
-      ns.status.longActive = false
-      write(ns)
-      return
-    }
-    if (ns.status.longLeft <= 0) { alert('No long absence left this month'); return }
-    ns.status.mode = 'long'
-    ns.status.longLeft -= 1
-    ns.status.longActive = true
-    ns.status.longUsedAt = Date.now()
+  if (ns.status.mode === 'short') return
+  if (ns.status.shortLeft <= 0) { alert('No short absences left this month'); return }
+  const TWO_DAYS = 2 * 24 * 60 * 60 * 1000
+  ns.status.mode = 'short'
+  ns.status.shortLeft -= 1
+  ns.status.shortUntil = Date.now() + TWO_DAYS
+  write(ns)
+}
+
+const toggleLong = () => {
+  const ns = clone(state)
+  if (ns.status.mode === 'long') {
+    // Выходим из long → старт 30-дневного восстановления
+    ns.status.mode = 'online'
+    ns.status.longActive = false
+    ns.status.longResetAt = Date.now() + MS30D
     write(ns)
+    return
   }
+  if (ns.status.longLeft <= 0) {
+    alert('No long absence left right now')
+    return
+  }
+  // Входим в long
+  ns.status.mode = 'long'
+  ns.status.longActive = true
+  ns.status.longUsedAt = Date.now()
+  ns.status.longLeft -= 1
+  write(ns)
+}
+
 
   // безопасный обратный таймер (если не short — пусто)
   const shortCountdown = useMemo(() => {
@@ -162,23 +226,36 @@ const match = (r: Row) => {
       <div className="flex flex-wrap items-center gap-2 mb-6">
         <button className="px-4 py-2 rounded-xl bg-white/15" onClick={toOnline}>Online</button>
 
-        <button
-          onClick={activateShort}
-          className={`px-4 py-2 rounded-xl ${state.status.mode === 'short' ? 'bg-green-600/30' : 'bg-white/10'}`}
-          title="Short absence: up to 2 days"
-        >
-          {state.status.mode === 'short'
-            ? `Pause · ${shortCountdown}`
-            : `Short absence · ${state.status.shortLeft} left`}
-        </button>
+        {/* SHORT */}
+<button
+  onClick={activateShort}
+  className={`px-4 py-2 rounded-xl ${state.status.mode === 'short' ? 'bg-green-600/30' : 'bg-white/10'}`}
+  title="Short absence: up to 2 days"
+>
+  {state.status.mode === 'short'
+    ? `Pause · ${shortCountdown}`
+    : (state.status.shortLeft > 0
+        ? `Short absence · ${state.status.shortLeft} left`
+        : `Short absence · restores in ${fmtLeft(nextMonthStartUTC() - Date.now())}`
+      )
+  }
+</button>
 
-        <button
-          onClick={toggleLong}
-          className={`px-4 py-2 rounded-xl ${state.status.mode === 'long' ? 'bg-red-600/30' : 'bg-white/10'}`}
-          title="Long absence: one per month"
-        >
-          {state.status.mode === 'long' ? 'Stop' : `Long absence · ${state.status.longLeft} left`}
-        </button>
+{/* LONG */}
+<button
+  onClick={toggleLong}
+  className={`px-4 py-2 rounded-xl ${state.status.mode === 'long' ? 'bg-red-600/30' : 'bg-white/10'}`}
+  title="Long absence: one per 30 days after finish"
+>
+  {state.status.mode === 'long'
+    ? 'Stop'
+    : (state.status.longLeft > 0
+        ? `Long absence · ${state.status.longLeft} left`
+        : `Long absence · restores in ${fmtLeft(Math.max(0, (state.status.longResetAt ?? 0) - Date.now()))}`
+      )
+  }
+</button>
+
 
         <div className="grow" />
         <button onClick={restoreRemoved} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
