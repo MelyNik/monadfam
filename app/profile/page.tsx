@@ -72,7 +72,7 @@ const s = state as AppState
   }
 
   const followFromAwaitOurs = (r: Row) => {
-    const ns = clone (state)
+    const ns = clone(s)
     ns.lists.await_ours = ns.lists.await_ours.filter(x => x.id !== r.id)
     ns.lists.mutual     = [{ ...r, days: 0 }, ...ns.lists.mutual]
     write(ns)
