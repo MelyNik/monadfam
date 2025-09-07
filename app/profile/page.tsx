@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { AppState, Row, loadState, saveState } from '@/lib/state'
+import { AppState, Row, loadState, saveState } from '../../lib/state'
 
 const yourAvatar     = 'https://unavatar.io/x/your_handle'
 const selectedAvatar = 'https://unavatar.io/x/selected_user'

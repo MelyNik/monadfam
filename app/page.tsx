@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { AppState, Row, loadState, saveState, takeNextFromPool, advancePool } from '@/lib/state'
+import { AppState, Row, loadState, saveState, takeNextFromPool, advancePool } from '../lib/state'
 
 function RatingBar() {
   return (
