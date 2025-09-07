@@ -1,25 +1,28 @@
 'use client'
 import { useMemo, useState } from 'react'
 
-type Row = { id:number; handle:string; days:number }
+type Row = { id:number; handle:string; days:number; score:number }
 
 const seedMutual: Row[] = [
-  {id:1, handle:'@alice', days:0},
-  {id:2, handle:'@bob', days:0},
+  {id:1, handle:'@alice', days:0, score:92},
+  {id:2, handle:'@bob', days:0, score:88},
 ]
 const seedAwaitTheir: Row[] = [
-  {id:3, handle:'@carol', days:2},
-  {id:4, handle:'@dave', days:5},
+  {id:3, handle:'@carol', days:2, score:75},
+  {id:4, handle:'@dave', days:5, score:40},
 ]
 const seedAwaitOurs: Row[] = [
-  {id:5, handle:'@erin', days:1},
-  {id:6, handle:'@frank', days:6},
+  {id:5, handle:'@erin', days:1, score:83},
+  {id:6, handle:'@frank', days:6, score:30},
 ]
 
 export default function ProfilePage(){
   const [shortLeft] = useState(4)
   const [longLeft] = useState(1)
   const [longCooldownDays] = useState(27)
+
+  const [siteFollowers] = useState(0)
+  const [siteFollowing] = useState(0)
 
   const [mutual,setMutual] = useState<Row[]>(seedMutual)
   const [awaitTheir,setAwaitTheir] = useState<Row[]>(seedAwaitTheir)
@@ -54,6 +57,12 @@ export default function ProfilePage(){
     setAwaitTheir(prev=>prev.filter(x=>x.id!==r.id))
   }
 
+  const Ring = ({size}:{size:number})=>(
+    <div className="ring-grad p-[3px] rounded-full" style={{width:size, height:size}}>
+      <div className="w-full h-full rounded-full bg-white/10" />
+    </div>
+  )
+
   return (
     <div className="min-h-screen max-w-6xl mx-auto px-4 py-8 text-white">
       <h1 className="text-3xl font-bold mb-6">Profile</h1>
@@ -85,45 +94,43 @@ export default function ProfilePage(){
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <aside className="card p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-16 w-16 rounded-full bg-white/10" />
-            <div>
-              <div className="font-semibold">@your_handle</div>
-              <div className="text-sm text-[var(--muted)]">Your X profile</div>
-            </div>
+      <div className="grid lg:grid-cols-3 gap-6 items-start">
+        <aside className="card p-5 flex flex-col items-center">
+          <Ring size={220} />
+          <div className="mt-5 w-full text-center">
+            <div className="font-semibold">@your_handle</div>
+            <div className="text-sm text-[var(--muted)]">Your X profile (preview)</div>
           </div>
-          <div className="space-y-2 text-sm text-[var(--muted)]">
-            <div>Bio: … <button className="text-white/90 underline">Refresh</button></div>
-            <div>Followers: 0 <button className="text-white/90 underline">Refresh</button></div>
-            <div>Following: 0 <button className="text-white/90 underline">Refresh</button></div>
-            <div>Posts: 0 <button className="text-white/90 underline">Refresh</button></div>
+          <div className="mt-6 w-full space-y-3 text-white/80">
+            <div className="flex items-center justify-between">
+              <span>Followers (site)</span>
+              <span className="flex items-center gap-2">{siteFollowers} <button className="underline">Refresh</button></span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Following (site)</span>
+              <span className="flex items-center gap-2">{siteFollowing} <button className="underline">Refresh</button></span>
+            </div>
           </div>
         </aside>
 
         <main className="card p-3">
           <div className="max-h-[60vh] overflow-auto space-y-3 pr-1">
-            {rows.length===0 && <div className="text-white/60 p-3">Nothing found.</div>}
+            {rows.length===0 and <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r=>{
               const overdue = r.days>=4
               return (
                 <div key={r.id} className={`flex items-center justify-between rounded-xl p-3 ${overdue?'bg-red-500/10':'bg-white/5'}`}>
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-white/10" />
+                    <div className="ring-grad p-[2px] rounded-full">
+                      <div className="h-10 w-10 rounded-full bg-white/10" />
+                    </div>
                     <div className="font-medium">{r.handle}</div>
                   </div>
                   <div className="flex items-center gap-2">
                     <a className="btn bg-white/10 hover:bg-white/15 text-sm" href="#">Open in X</a>
-                    {tab==='mutual' && (
-                      <button onClick={()=>unfollowFromMutual(r)} className="btn bg-white/10 hover:bg-white/15 text-sm">Unfollow</button>
-                    )}
-                    {tab==='await_ours' && (
-                      <button onClick={()=>declineFromAwaitOurs(r)} className="btn bg-white/10 hover:bg-white/15 text-sm">Decline</button>
-                    )}
-                    {tab==='await_their' && (
-                      <button onClick={()=>unfollowFromAwaitTheir(r)} className="btn bg-white/10 hover:bg-white/15 text-sm">Unfollow</button>
-                    )}
+                    {tab==='mutual' && <button onClick={()=>unfollowFromMutual(r)} className="btn bg-white/10 hover:bg-white/15 text-sm">Unfollow</button>}
+                    {tab==='await_ours' && <button onClick={()=>declineFromAwaitOurs(r)} className="btn bg-white/10 hover:bg-white/15 text-sm">Decline</button>}
+                    {tab==='await_their' && <button onClick={()=>unfollowFromAwaitTheir(r)} className="btn bg-white/10 hover:bg-white/15 text-sm">Unfollow</button>}
                   </div>
                 </div>
               )
@@ -131,19 +138,21 @@ export default function ProfilePage(){
           </div>
         </main>
 
-        <aside className="card p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-16 w-16 rounded-full bg-white/10" />
-            <div>
-              <div className="font-semibold">@selected_user</div>
-              <div className="text-sm text-[var(--muted)]">Selected user</div>
-            </div>
+        <aside className="card p-5 flex flex-col items-center">
+          <Ring size={220} />
+          <div className="mt-5 w-full text-center">
+            <div className="font-semibold">@selected_user</div>
+            <div className="text-sm text:[var(--muted)]">Selected user (preview)</div>
           </div>
-          <div className="space-y-2 text-sm text-[var(--muted)]">
-            <div>Bio: … <button className="text-white/90 underline">Refresh</button></div>
-            <div>Followers: 0 <button className="text-white/90 underline">Refresh</button></div>
-            <div>Following: 0 <button className="text-white/90 underline">Refresh</button></div>
-            <div>Posts: 0 <button className="text-white/90 underline">Refresh</button></div>
+          <div className="mt-6 w-full space-y-3 text-white/80">
+            <div className="flex items-center justify-between">
+              <span>Followers (site)</span>
+              <span className="flex items-center gap-2">0 <button className="underline">Refresh</button></span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Following (site)</span>
+              <span className="flex items-center gap-2">0 <button className="underline">Refresh</button></span>
+            </div>
           </div>
         </aside>
       </div>
