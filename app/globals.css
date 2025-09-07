@@ -2,21 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Color tokens */
 :root {
   --bg-start: #0b0b14;
   --bg-end: #0e0b18;
-  --card: rgba(255,255,255,0.06);
-  --border: rgba(255,255,255,0.12);
+  --card: rgba(255,255,255,0.05);
+  --border: rgba(255,255,255,0.10);
   --accent: #7C5CFF;
   --accent-hover: #9A86FF;
-  --muted: rgba(255,255,255,0.7);
 }
 
-body { color:white; background:linear-gradient(135deg,var(--bg-start),var(--bg-end)); }
-
-.card { background:var(--card); border:1px solid var(--border); border-radius:1.25rem; }
-.input { background:rgba(255,255,255,0.08); border:1px solid var(--border); border-radius:0.75rem; padding:0.6rem 0.8rem; }
-.btn { border-radius:0.9rem; padding:0.6rem 1rem; }
-
-/* Helpers for rating ring */
-.ring-grad { background: conic-gradient(#22c55e, #eab308, #ef4444); } /* green→yellow→red */
+body { color: white; background: linear-gradient(135deg, var(--bg-start), var(--bg-end)); }
