@@ -115,7 +115,7 @@ export default function ProfilePage(){
 
         <main className="card p-3">
           <div className="max-h-[60vh] overflow-auto space-y-3 pr-1">
-            {rows.length===0 and <div className="text-white/60 p-3">Nothing found.</div>}
+            {rows.length===0 && <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r=>{
               const overdue = r.days>=4
               return (
@@ -142,7 +142,7 @@ export default function ProfilePage(){
           <Ring size={220} />
           <div className="mt-5 w-full text-center">
             <div className="font-semibold">@selected_user</div>
-            <div className="text-sm text:[var(--muted)]">Selected user (preview)</div>
+            <div className="text-sm text-[var(--muted)]">Selected user (preview)</div>
           </div>
           <div className="mt-6 w-full space-y-3 text-white/80">
             <div className="flex items-center justify-between">
