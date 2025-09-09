@@ -7,11 +7,10 @@ import {
 } from '../lib/state'
 
 function RatingBar({ value = 50 }: { value?: number }) {
+  // value: 0..100 — задаём ширину маски справа
+  const maskRight = `${Math.max(0, 100 - value)}%`
   return (
-    <div className="w-full h-2 rounded-full bg-white/10 relative overflow-hidden">
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg,#ef4444,#eab308,#22c55e)' }} />
-      <div className="absolute inset-y-0 left-0 bg-black/40" style={{ width: `${Math.max(0, 100 - value)}%` }} />
-    </div>
+    <div className="rating-bar" style={{ ['--rating-mask' as any]: maskRight }} />
   )
 }
 
@@ -58,22 +57,21 @@ export default function HomePage() {
     setShowTutorial(false)
   }
 
-  const doReset = () => {
-    const s = resetDemoData()
-    setState(s)
-  }
-
+  const doReset = () => { const s = resetDemoData(); setState(s) }
   const rPct = candidate ? ratingPercent(candidate) : 50
 
   return (
     <div className="min-h-screen max-w-[1000px] mx-auto px-6 py-8 text-white">
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <h1 className="text-5xl font-extrabold">The Monad Fam</h1>
-          <p className="text-white/70">for those who are looking for a fam</p>
-        </div>
-        <button onClick={doReset} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15">Reset demo data</button>
-      </div>
+      {/* Кнопка Reset не влияет на поток: fixed */}
+      <button
+        onClick={doReset}
+        className="fixed top-5 right-6 z-50 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15"
+      >
+        Reset demo data
+      </button>
+
+      <h1 className="text-5xl font-extrabold text-center mb-2">The Monad Fam</h1>
+      <p className="text-center mb-8 text-white/70">for those who are looking for a fam</p>
 
       <div className="card mx-auto max-w-[520px] px-8 py-8 text-center">
         {candidate ? (
@@ -85,12 +83,11 @@ export default function HomePage() {
             />
             <div className="text-xl font-semibold">{candidate.name}</div>
             <div className="text-white/70 mb-4">{candidate.handle}</div>
+
             <RatingBar value={rPct} />
 
             <div className="mt-6 flex justify-center gap-3">
-              <button onClick={doSkip} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
-                Skip
-              </button>
+              <button onClick={doSkip} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">Skip</button>
               <button
                 onClick={doFollow}
                 disabled={disabledByStatus}
@@ -99,6 +96,7 @@ export default function HomePage() {
                 Follow
               </button>
             </div>
+
             {disabledByStatus && (
               <div className="mt-3 text-sm text-white/60">
                 You are not online now. Set status to <b>Online</b> to follow.
@@ -110,6 +108,7 @@ export default function HomePage() {
         )}
       </div>
 
+      {/* FAQ */}
       <div className="max-w-[900px] mx-auto mt-10">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xl font-semibold">FAQ</h2>
