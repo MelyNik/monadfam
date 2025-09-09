@@ -4,7 +4,7 @@ import {
   AppState, Row, loadState, saveState,
   advancePool, clone, peekNextFromPool,
   ratingPercent, resetDemoData
-} from '@lib/state' // используем алиас из tsconfig.json
+} from '../lib/state' // ← вернули относительный импорт
 
 function RatingBar({ value = 50 }: { value?: number }) {
   // value: 0..100 — задаём ширину маски справа
@@ -18,14 +18,12 @@ export default function HomePage() {
   const [state, setState] = useState<AppState | null>(null)
   const [showTutorial, setShowTutorial] = useState(false)
 
-  // загрузка состояния
   useEffect(() => {
     const s = loadState()
     setState(s)
     if (!s.tutorialDone) setShowTutorial(true)
   }, [])
 
-  // кандидат на карточке
   const candidate: Row | null = useMemo(() => {
     if (!state) return null
     return peekNextFromPool(state)
