@@ -27,17 +27,19 @@
   --rating-gradient: linear-gradient(
     90deg,
     #22c55e 0%,
-    #86efac 22%,
+    #34d399 16%,
+    #a3e635 28%,
     #eab308 50%,
-    #f59e0b 78%,
+    #f59e0b 66%,
+    #fb923c 82%,
     #ef4444 100%
   );
   --rating-conic: conic-gradient(
-    from 180deg,
+    from 270deg,
     #22c55e 0deg,
-    #86efac 110deg,
+    #34d399 90deg,
     #eab308 180deg,
-    #f59e0b 250deg,
+    #fb923c 270deg,
     #ef4444 360deg
   );
 

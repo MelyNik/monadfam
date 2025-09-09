@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AppState, Row, loadState, saveState, clone,
   startOfMonthUTC, nextMonthStartFrom,
-  ratingColor, resetDemoData, pushEvent
-} from '../../lib/state' // ← вернули относительный импорт
+  resetDemoData, pushEvent
+} from '../../lib/state'
 
 const MS30D = 30 * 24 * 60 * 60 * 1000
 
@@ -59,9 +59,6 @@ export default function ProfilePage(){
     const n = (r.name   || '').toLowerCase()
     return h.includes(qNorm) || n.includes(qNorm)
   }
-
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -291,8 +288,8 @@ export default function ProfilePage(){
           <div className="space-y-4">
             {rows.length === 0 && <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r => {
-              const badge = (tab === 'mutual' || tab === 'await_their') ? statusBadge(r) : null
               const can   = canVoteOnRow(r, tab, Date.now())
+              const b     = statusBadge(r)
               const whyDisabled =
                 r.myVote ? 'You have already voted for this profile'
                 : (tab === 'await_ours' ? 'Voting is not available in this tab'
@@ -309,39 +306,45 @@ export default function ProfilePage(){
                       ? 'border-red-400/30 bg-red-500/5'
                       : 'border-white/10 bg-white/5'}`}
                 >
-                  {/* LEFT */}
+                  {/* LEFT: аватар + статус ПОД аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
-                    <div className="avatar-ring-sm"><div className="avatar-ring-sm-inner">
-                      <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
-                    </div></div>
+                    <div className="flex flex-col items-center">
+                      <div className="avatar-ring-sm">
+                        <div className="avatar-ring-sm-inner">
+                          <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
+                        </div>
+                      </div>
+                      <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full ${b.className}`}>{b.label}</div>
+                    </div>
                     <div className="leading-5">
                       <div className="font-semibold">{r.name}</div>
                       <div className="text-white/70 text-sm">{r.handle}</div>
                     </div>
                   </div>
 
-                  {/* MIDDLE */}
+                  {/* MIDDLE: кнопки голосования как на макете */}
                   <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
-                    {badge && (
-                      <div className={`text-xs px-2 py-0.5 rounded-full ${badge.className}`}>{badge.label}</div>
-                    )}
                     {(tab !== 'await_ours') && (
                       <>
+                        {/* ЗА */}
                         <button
                           disabled={!can}
                           title={can ? 'Vote for' : undefined}
                           onClick={() => vote(r, 'up')}
-                          className={`px-4 py-3 rounded-2xl text-base flex items-center justify-center ${can ? 'bg-green-500/20 hover:bg-green-500/30' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
-                          style={{ width: 56, height: 40 }}
+                          className={`rounded-2xl flex items-center justify-center
+                            ${can ? 'bg-green-500/25 hover:bg-green-500/35' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
+                          style={{ width: 82, height: 34 }}
                         >
                           <ThumbUp />
                         </button>
+                        {/* ПРОТИВ */}
                         <button
                           disabled={!can}
                           title={can ? 'Vote against' : undefined}
                           onClick={() => vote(r, 'down')}
-                          className={`px-4 py-3 rounded-2xl text-base flex items-center justify-center ${can ? 'bg-red-500/20 hover:bg-red-500/30' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
-                          style={{ width: 56, height: 40 }}
+                          className={`rounded-2xl flex items-center justify-center
+                            ${can ? 'bg-red-500/25 hover:bg-red-500/35' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
+                          style={{ width: 82, height: 34 }}
                         >
                           <ThumbDown />
                         </button>
