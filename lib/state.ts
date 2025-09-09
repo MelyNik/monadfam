@@ -6,33 +6,29 @@ export type Row = {
   name: string
   handle: string
   avatarUrl?: string
-  days: number                    // сколько дней «в системе» (в любой вкладке)
-  statusMode?: StatusMode         // online | short | long — статус ЭТОГО профиля
-  // Голосование (агрегация + наш голос)
+  days: number                    // сколько дней «в системе»
+  statusMode?: StatusMode         // статус ЭТОГО профиля
   votesUp?: number
   votesDown?: number
-  myVote?: 'up' | 'down'          // наш голос (один раз на профиль)
+  myVote?: 'up' | 'down'          // наш голос по этому профилю
 }
 
 export type Lists = { mutual: Row[]; await_their: Row[]; await_ours: Row[] }
 export type Removed = { from: 'await_their' | 'await_ours'; row: Row }[]
 
 export type Status = {
-  // наш собственный статус (управляет доступностью Follow и т.д.)
   mode: StatusMode
-
-  // Short: попытки восстанавливаются в ПЕРВЫЙ день нового календарного месяца
   shortLeft: number
   shortUntil?: number
   shortMonthStart?: number
-
-  // Long: попытка восстанавливается через 30 дней ПОСЛЕ выхода из long
   longLeft: number
   longActive?: boolean
   longUsedAt?: number
   longMonthStart?: number
   longResetAt?: number
 }
+
+export type EventItem = { ts: number; kind: string; details?: string }
 
 export type AppState = {
   lists: Lists
@@ -41,8 +37,8 @@ export type AppState = {
   tutorialDone?: boolean
   homePool: Row[]
   homeIndex: number
-  // учёт календарного шага дней для инкремента r.days
-  lastDaysAt?: number             // UTC-полночь дня, когда последний раз инкрементили days
+  lastDaysAt?: number
+  events: EventItem[]            // лог «хлебных крошек»
 }
 
 const KEY = 'monadfam:v1'
@@ -54,7 +50,7 @@ export function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v))
 }
 
-// --- DEMO пул (статусы есть, чтобы проверить фильтрацию)
+// --- DEMO
 const demoUsers: Row[] = [
   { id: 101, name: 'Nik',   handle: '@user1', avatarUrl: 'https://unavatar.io/x/user1', days: 5, statusMode: 'online', votesUp: 12, votesDown: 3 },
   { id: 102, name: 'Lena',  handle: '@user2', avatarUrl: 'https://unavatar.io/x/user2', days: 7, statusMode: 'short',  votesUp: 5,  votesDown: 1 },
@@ -74,7 +70,7 @@ const seedAwaitOurs: Row[] = [
   { id: 6, name: 'name', handle: '@frank', days: 6, avatarUrl: 'https://unavatar.io/x/frank', votesUp: 10, votesDown: 1 },
 ]
 
-// ===== время (UTC-месяц и UTC-день)
+// ===== время (UTC)
 export function startOfMonthUTC(ts: number) {
   const d = new Date(ts)
   const y = d.getUTCFullYear(), m = d.getUTCMonth()
@@ -113,6 +109,7 @@ export function defaultState(): AppState {
     homePool: demoUsers,
     homeIndex: 0,
     lastDaysAt: startOfDayUTC(now),
+    events: [],
   }
 }
 
@@ -139,31 +136,22 @@ function sanitizeLists(x: any): Lists {
     await_ours:   Array.isArray(x?.await_ours)   ? x.await_ours.map(sanitizeRow)   : (Array.isArray(x?.awaitOurs)  ? x.awaitOurs.map(sanitizeRow)  : []),
   }
 }
-
 function normalizeStatus(st: Status): Status {
   const ns: Status = { ...st }
-
-  // SHORT: первый день нового календарного месяца → вернуть 4 попытки
   if (isNewCalendarMonth(ns.shortMonthStart)) {
     ns.shortMonthStart = startOfMonthUTC(Date.now())
     ns.shortLeft = 4
   }
-  // истёк активный short → выйти в online
   if (ns.mode === 'short' && ns.shortUntil && Date.now() >= ns.shortUntil) {
     ns.mode = 'online'
     ns.shortUntil = undefined
   }
-
-  // LONG: если попыток нет и пришло время ресета → вернуть 1 попытку
   if (ns.longLeft <= 0 && ns.longResetAt && Date.now() >= ns.longResetAt) {
     ns.longLeft = 1
     ns.longResetAt = undefined
   }
-
   return ns
 }
-
-// ——— инкремент days раз в новые календарные сутки (UTC)
 function bumpDaysIfNeeded(s: AppState): AppState {
   const today = startOfDayUTC(Date.now())
   const last  = s.lastDaysAt ?? today
@@ -172,11 +160,7 @@ function bumpDaysIfNeeded(s: AppState): AppState {
   const inc = (list: Row[]) => list.map(r => ({ ...r, days: (r.days ?? 0) + delta }))
   return {
     ...s,
-    lists: {
-      mutual: inc(s.lists.mutual),
-      await_their: inc(s.lists.await_their),
-      await_ours: inc(s.lists.await_ours),
-    },
+    lists: { mutual: inc(s.lists.mutual), await_their: inc(s.lists.await_their), await_ours: inc(s.lists.await_ours) },
     lastDaysAt: today,
   }
 }
@@ -193,6 +177,7 @@ export function loadState(): AppState {
       status: normalizeStatus(parsed?.status ?? defaultState().status),
       homePool: Array.isArray(parsed?.homePool) ? parsed.homePool.map(sanitizeRow) : defaultState().homePool,
       lastDaysAt: Number.isFinite(parsed?.lastDaysAt) ? Number(parsed.lastDaysAt) : defaultState().lastDaysAt,
+      events: Array.isArray(parsed?.events) ? parsed.events.slice(0, 200) : [],
     }
     s = bumpDaysIfNeeded(s)
     return s
@@ -201,6 +186,14 @@ export function loadState(): AppState {
   }
 }
 export function saveState(s: AppState) { localStorage.setItem(KEY, JSON.stringify(s)) }
+
+// reset demo data
+export function resetDemoData(): AppState {
+  localStorage.removeItem(KEY)
+  const s = defaultState()
+  saveState(s)
+  return s
+}
 
 // ——— доступность профиля для показа на главной (онлайн)
 function isRowAvailable(r: Row) {
@@ -243,21 +236,23 @@ export function peekNextFromPool(s: AppState): Row | null {
   return null
 }
 
-// ——— голосование/рейтинг (байесовская сглаженная доля)
-const PRIOR_UP = 20   // чем больше, тем менее чувствителен к мелким минусам
+// ——— рейтинг (байес-сглаженная доля)
+const PRIOR_UP = 20
 const PRIOR_DN = 5
 export function rating01(r: Row): number {
   const up = Math.max(0, r.votesUp ?? 0)
   const dn = Math.max(0, r.votesDown ?? 0)
-  const v  = (up + PRIOR_UP) / (up + dn + PRIOR_UP + PRIOR_DN) // 0..1
-  return v
+  return (up + PRIOR_UP) / (up + dn + PRIOR_UP + PRIOR_DN)
 }
 export function ratingPercent(r: Row): number {
-  return Math.round(rating01(r) * 100) // 0..100
+  return Math.round(rating01(r) * 100)
 }
 export function ratingColor(r: Row): string {
-  // от красного к зелёному по hue 0..120
-  const pct = rating01(r)
-  const hue = Math.round(120 * pct)
+  const hue = Math.round(120 * rating01(r)) // 0..120
   return `hsl(${hue} 70% 50%)`
+}
+
+// ——— лог событий
+export function pushEvent(s: AppState, kind: string, details?: string) {
+  s.events = [{ ts: Date.now(), kind, details }, ...(s.events ?? [])].slice(0, 200)
 }

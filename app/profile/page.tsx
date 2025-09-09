@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AppState, Row, loadState, saveState, clone,
   startOfMonthUTC, nextMonthStartFrom,
-  ratingPercent, ratingColor
+  ratingPercent, ratingColor, resetDemoData, pushEvent
 } from '../../lib/state'
 
 const MS30D = 30 * 24 * 60 * 60 * 1000
@@ -17,19 +17,18 @@ function fmtLeft(ms: number) {
   return d > 0 ? `${d}d ${h}h ${m}m` : `${h}:${m}:${s}`
 }
 
-const yourAvatar     = 'https://unavatar.io/x/your_handle'
+const yourAvatar = 'https://unavatar.io/x/your_handle'
 type Tab = 'mutual' | 'await_their' | 'await_ours'
 
 function isVotingDay(ts: number) {
-  // локальное время пользователя (в браузере): Tue (2) или Sat (6)
   const dow = new Date(ts).getDay()
-  return dow === 2 || dow === 6
+  return dow === 2 || dow === 6 // Tue/Sat
 }
 function canVoteOnRow(r: Row, tab: Tab, now: number) {
-  if (tab === 'await_ours') return false                 // эта вкладка не участвует
+  if (tab === 'await_ours') return false
   if ((r.statusMode ?? 'online') !== 'online') return false
   if (!isVotingDay(now)) return false
-  if ((r.days ?? 0) < 4) return false                   // «больше 4 дней» — допускаем с 4 и выше
+  if ((r.days ?? 0) < 4) return false
   if (r.myVote) return false
   return true
 }
@@ -53,14 +52,14 @@ export default function ProfilePage(){
     return h.includes(qNorm) || n.includes(qNorm)
   }
 
-  // «тик» для таймеров и «дня»
+  // «тик» для таймеров и дня
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
 
-  // служебные таймеры: истечение short, месячный ресет short, ресет long
+  // служебные таймеры
   useEffect(() => {
     const t = setInterval(() => {
       setState(prev => {
@@ -68,29 +67,26 @@ export default function ProfilePage(){
         let changed = false
         const nowTs = Date.now()
 
-        // 1) Short истёк → выйти в online
         if (ns.status.mode === 'short' && ns.status.shortUntil && nowTs >= ns.status.shortUntil) {
           ns.status.mode = 'online'
           ns.status.shortUntil = undefined
+          pushEvent(ns, 'status:short:end', 'Short ended → online')
           changed = true
         }
-
-        // 2) Первый день нового месяца → вернуть 4 short-попытки
         const lastMonthStart = ns.status.shortMonthStart ?? startOfMonthUTC(nowTs)
         const nextBoundary   = nextMonthStartFrom(lastMonthStart)
         if (nowTs >= nextBoundary) {
           ns.status.shortLeft = 4
           ns.status.shortMonthStart = nextBoundary
+          pushEvent(ns, 'status:short:refill', 'Short attempts refilled (month boundary)')
           changed = true
         }
-
-        // 3) Long восстановить через 30 дней после выхода
         if (ns.status.longLeft <= 0 && ns.status.longResetAt && nowTs >= ns.status.longResetAt) {
           ns.status.longLeft = 1
           ns.status.longResetAt = undefined
+          pushEvent(ns, 'status:long:refill', 'Long attempt restored after 30 days')
           changed = true
         }
-
         if (changed) saveState(ns)
         return changed ? ns : prev
       })
@@ -110,30 +106,34 @@ export default function ProfilePage(){
   const write = (ns: AppState) => { saveState(ns); setState(ns) }
   const ask = (msg = 'Confirm your choice?') => window.confirm(msg)
 
-  // ——— действия по вкладкам (без изменений)
+  // ——— действия по вкладкам
   const unfollowFromMutual = (r: Row) => {
     if (!ask()) return
     const ns = clone(state)
     ns.lists.mutual = ns.lists.mutual.filter(x => x.id !== r.id)
     ns.lists.await_ours = [{ ...r, days: r.days ?? 0 }, ...ns.lists.await_ours]
+    pushEvent(ns, 'move', `${r.handle}: mutual → await_ours`)
     write(ns)
   }
   const unfollowFromAwaitTheir = (r: Row) => {
     if (!ask()) return
     const ns = clone(state)
     ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
+    pushEvent(ns, 'remove', `${r.handle}: removed from await_their`)
     write(ns)
   }
   const followFromAwaitOurs = (r: Row) => {
     const ns = clone(state)
     ns.lists.await_ours = ns.lists.await_ours.filter(x => x.id !== r.id)
     ns.lists.mutual     = [{ ...r, days: r.days ?? 0 }, ...ns.lists.mutual]
+    pushEvent(ns, 'move', `${r.handle}: await_ours → mutual`)
     write(ns)
   }
   const declineFromAwaitOurs = (r: Row) => {
     if (!ask()) return
     const ns = clone(state)
     ns.lists.await_ours = ns.lists.await_ours.filter(x => x.id !== r.id)
+    pushEvent(ns, 'remove', `${r.handle}: declined in await_ours`)
     write(ns)
   }
   const softRemove = (from: 'await_their' | 'await_ours', r: Row) => {
@@ -142,6 +142,7 @@ export default function ProfilePage(){
     if (from === 'await_their') ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     if (from === 'await_ours')  ns.lists.await_ours  = ns.lists.await_ours .filter(x => x.id !== r.id)
     ns.removed = [{ from, row: r }, ...ns.removed]
+    pushEvent(ns, 'soft-remove', `${r.handle}: removed from ${from}`)
     write(ns)
   }
   const restoreRemoved = () => {
@@ -152,10 +153,11 @@ export default function ProfilePage(){
       if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours]
     })
     ns.removed = []
+    pushEvent(ns, 'restore', `Restored ${removed.length} profiles`)
     write(ns)
   }
 
-  // ——— статусы (как раньше)
+  // ——— статусы
   const toOnline = () => {
     const ns = clone(state)
     if (ns.status.mode === 'long') {
@@ -164,6 +166,7 @@ export default function ProfilePage(){
     }
     ns.status.mode = 'online'
     ns.status.shortUntil = undefined
+    pushEvent(ns, 'status:set', 'You switched to ONLINE')
     write(ns)
   }
   const activateShort = () => {
@@ -178,6 +181,7 @@ export default function ProfilePage(){
     ns.status.mode = 'short'
     ns.status.shortLeft -= 1
     ns.status.shortUntil = Date.now() + TWO_DAYS
+    pushEvent(ns, 'status:set', 'You switched to SHORT')
     write(ns)
   }
   const toggleLong = () => {
@@ -186,6 +190,7 @@ export default function ProfilePage(){
       ns.status.mode = 'online'
       ns.status.longActive = false
       ns.status.longResetAt = Date.now() + MS30D
+      pushEvent(ns, 'status:set', 'You left LONG → ONLINE')
       write(ns)
       return
     }
@@ -194,6 +199,7 @@ export default function ProfilePage(){
     ns.status.longActive = true
     ns.status.longUsedAt = Date.now()
     ns.status.longLeft -= 1
+    pushEvent(ns, 'status:set', 'You switched to LONG')
     write(ns)
   }
 
@@ -210,6 +216,7 @@ export default function ProfilePage(){
     if (dir === 'down') row.votesDown = (row.votesDown ?? 0) + 1
     row.myVote = dir
     list[idx] = row
+    pushEvent(ns, 'vote', `${row.handle}: ${dir === 'up' ? 'up' : 'down'}`)
     write(ns)
   }
 
@@ -239,13 +246,21 @@ export default function ProfilePage(){
   }
   const overdue = (r: Row) => (tab === 'await_their' || tab === 'await_ours') && (r.days ?? 0) >= 4
 
-  // правая большая карточка: выбранный
+  // правая большая карточка
   const selectedRow = selected ?? rows[0] ?? null
   const selectedColor = selectedRow ? ratingColor(selectedRow) : '#888'
 
+  const doReset = () => {
+    const s = resetDemoData()
+    setState(s)
+  }
+
   return (
     <div className="min-h-screen max-w-[1600px] mx-auto px-8 py-8 text-white">
-      <h1 className="text-3xl font-bold mb-6">Profile</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">Profile</h1>
+        <button onClick={doReset} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15">Reset demo data</button>
+      </div>
 
       {/* statuses + restore */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -320,11 +335,11 @@ export default function ProfilePage(){
           <div className="space-y-4">
             {rows.length === 0 && <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r => {
-              const softCross = tab === 'await_their' || tab === 'await_ours'
               const color = ratingColor(r)
               const pct   = ratingPercent(r)
               const badge = (tab === 'mutual' || tab === 'await_their') ? statusBadge(r) : null
-              const canVote = canVoteOnRow(r, tab, now)
+              const can   = canVoteOnRow(r, tab, now)
+
               const whyDisabled =
                 r.myVote ? 'You have already voted for this profile'
                 : (tab === 'await_ours' ? 'Voting is not available in this tab'
@@ -343,15 +358,13 @@ export default function ProfilePage(){
                 >
                   {/* LEFT: avatar + name/handle + badge */}
                   <div className="flex items-center gap-3">
-                    <div className="avatar-ring-sm">
-                      <div className="avatar-ring-sm-inner" style={{ borderColor: color }}>
-                        <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
-                      </div>
-                    </div>
+                    <div className="avatar-ring-sm"><div className="avatar-ring-sm-inner" style={{ borderColor: color }}>
+                      <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
+                    </div></div>
                     <div className="leading-5">
                       <div className="font-semibold">{r.name}</div>
                       <div className="text-white/70 text-sm">{r.handle}</div>
-                      {(badge) && (
+                      {badge && (
                         <div className={`mt-1 inline-block text-xs px-2 py-0.5 rounded-full ${badge.className}`}>
                           {badge.label}
                         </div>
@@ -359,36 +372,42 @@ export default function ProfilePage(){
                     </div>
                   </div>
 
-                  {/* MIDDLE: voting buttons */}
-                  <div className="flex items-center gap-2"
-                       onClick={e => e.stopPropagation()}>
+                  {/* MIDDLE: voting buttons + кружок-подсказка */}
+                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                     {(tab !== 'await_ours') && (
                       <>
                         <button
-                          disabled={!canVote}
-                          title={canVote ? 'Vote for (за)' : whyDisabled}
+                          disabled={!can}
+                          title={can ? 'Vote for (за)' : undefined}
                           onClick={() => vote(r, 'up')}
-                          className={`px-3 py-2 rounded-xl text-sm ${canVote ? 'bg-green-500/20 hover:bg-green-500/30' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
+                          className={`px-3 py-2 rounded-xl text-sm ${can ? 'bg-green-500/20 hover:bg-green-500/30' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
                         >
                           За
                         </button>
                         <button
-                          disabled={!canVote}
-                          title={canVote ? 'Vote against (против)' : whyDisabled}
+                          disabled={!can}
+                          title={can ? 'Vote against (против)' : undefined}
                           onClick={() => vote(r, 'down')}
-                          className={`px-3 py-2 rounded-xl text-sm ${canVote ? 'bg-red-500/20 hover:bg-red-500/30' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
+                          className={`px-3 py-2 rounded-xl text-sm ${can ? 'bg-red-500/20 hover:bg-red-500/30' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
                         >
                           Против
                         </button>
+                        {/* кружок «!» с всплывашкой — показываем, если голосовать нельзя */}
+                        {!can && (
+                          <div className="relative group inline-block">
+                            <div className="w-5 h-5 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
+                            <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
+                              {whyDisabled || 'Voting is unavailable'}
+                            </div>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
 
-                  {/* RIGHT: actions */}
-                  <div className="flex items-center gap-3"
-                       onClick={e => e.stopPropagation()}>
+                  {/* RIGHT: rating + actions */}
+                  <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
                     <div className="w-28">
-                      {/* мини-бар рейтинга */}
                       <div className="w-full h-1.5 rounded-full bg-white/10 relative overflow-hidden">
                         <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg,#ef4444,#eab308,#22c55e)' }} />
                         <div className="absolute inset-y-0 left-0 bg-black/40" style={{ width: `${Math.max(0, 100 - pct)}%` }} />
@@ -425,42 +444,51 @@ export default function ProfilePage(){
                       </>
                     )}
                   </div>
-
-                  {/* soft delete cross */}
-                  {softCross && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); softRemove(tab as 'await_their' | 'await_ours', r) }}
-                      className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs"
-                      title="Remove from this tab"
-                    >×</button>
-                  )}
                 </div>
               )
             })}
           </div>
         </main>
 
-        {/* RIGHT CARD — выбранный профиль */}
-        <aside className="card p-5 flex-shrink-0 w-[360px] flex flex-col items-center">
-          {selectedRow ? (
-            <>
-              <div className="avatar-ring-xl">
-                <div className="avatar-ring-xl-inner" style={{ borderColor: selectedColor }}>
-                  <img src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'} alt={selectedRow.handle} className="avatar-xl"/>
+        {/* RIGHT CARD — выбранный профиль + лог событий */}
+        <aside className="flex-shrink-0 w-[360px] space-y-4">
+          <div className="card p-5 flex flex-col items-center">
+            {selectedRow ? (
+              <>
+                <div className="avatar-ring-xl">
+                  <div className="avatar-ring-xl-inner" style={{ borderColor: selectedColor }}>
+                    <img src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'} alt={selectedRow.handle} className="avatar-xl"/>
+                  </div>
                 </div>
-              </div>
-              <div className="mt-5 text-center">
-                <div className="font-semibold text-lg">{selectedRow.name}</div>
-                <div className="text-sm text-white/70">{selectedRow.handle}</div>
-              </div>
-              <div className="mt-6 w-full space-y-3 text-white/80">
-                <div className="flex items-center justify-between"><span>Followers</span><span>0</span></div>
-                <div className="flex items-center justify-between"><span>Following</span><span>0</span></div>
-              </div>
-            </>
-          ) : (
-            <div className="text-white/60">Select a profile from the list</div>
-          )}
+                <div className="mt-5 text-center">
+                  <div className="font-semibold text-lg">{selectedRow.name}</div>
+                  <div className="text-sm text-white/70">{selectedRow.handle}</div>
+                </div>
+                <div className="mt-6 w-full space-y-3 text-white/80">
+                  <div className="flex items-center justify-between"><span>Followers</span><span>0</span></div>
+                  <div className="flex items-center justify-between"><span>Following</span><span>0</span></div>
+                </div>
+              </>
+            ) : (
+              <div className="text-white/60">Select a profile from the list</div>
+            )}
+          </div>
+
+          {/* лог событий */}
+          <div className="card p-4">
+            <div className="font-semibold mb-2">Activity</div>
+            <div className="space-y-1 max-h-[300px] overflow-auto pr-1">
+              {state.events.length === 0 && <div className="text-white/60 text-sm">No events yet</div>}
+              {state.events.slice(0, 20).map((e, i) => (
+                <div key={i} className="text-xs text-white/80 flex gap-2">
+                  <span className="text-white/50">{new Date(e.ts).toLocaleString()}</span>
+                  <span className="text-white/60">·</span>
+                  <span>{e.kind}</span>
+                  {e.details && <span className="text-white/60">— {e.details}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
         </aside>
       </div>
     </div>

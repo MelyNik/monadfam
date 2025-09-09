@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AppState, Row, loadState, saveState,
   takeNextFromPool, advancePool, clone, peekNextFromPool,
-  ratingPercent
+  ratingPercent, resetDemoData
 } from '../lib/state'
 
 function RatingBar({ value = 50 }: { value?: number }) {
@@ -58,12 +58,22 @@ export default function HomePage() {
     setShowTutorial(false)
   }
 
+  const doReset = () => {
+    const s = resetDemoData()
+    setState(s)
+  }
+
   const rPct = candidate ? ratingPercent(candidate) : 50
 
   return (
     <div className="min-h-screen max-w-[1000px] mx-auto px-6 py-8 text-white">
-      <h1 className="text-5xl font-extrabold text-center mb-2">The Monad Fam</h1>
-      <p className="text-center mb-8 text-white/70">for those who are looking for a fam</p>
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h1 className="text-5xl font-extrabold">The Monad Fam</h1>
+          <p className="text-white/70">for those who are looking for a fam</p>
+        </div>
+        <button onClick={doReset} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15">Reset demo data</button>
+      </div>
 
       <div className="card mx-auto max-w-[520px] px-8 py-8 text-center">
         {candidate ? (
