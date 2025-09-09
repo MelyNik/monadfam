@@ -6,16 +6,21 @@ export type Row = {
   name: string
   handle: string
   avatarUrl?: string
-  days: number
-  // статус конкретного пользователя (для фильтрации на главной)
-  statusMode?: StatusMode // online | short | long
+  days: number                    // сколько дней «в системе» (в любой вкладке)
+  statusMode?: StatusMode         // online | short | long — статус ЭТОГО профиля
+  // Голосование (агрегация + наш голос)
+  votesUp?: number
+  votesDown?: number
+  myVote?: 'up' | 'down'          // наш голос (один раз на профиль)
 }
 
 export type Lists = { mutual: Row[]; await_their: Row[]; await_ours: Row[] }
 export type Removed = { from: 'await_their' | 'await_ours'; row: Row }[]
 
 export type Status = {
+  // наш собственный статус (управляет доступностью Follow и т.д.)
   mode: StatusMode
+
   // Short: попытки восстанавливаются в ПЕРВЫЙ день нового календарного месяца
   shortLeft: number
   shortUntil?: number
@@ -36,10 +41,10 @@ export type AppState = {
   tutorialDone?: boolean
   homePool: Row[]
   homeIndex: number
+  // учёт календарного шага дней для инкремента r.days
+  lastDaysAt?: number             // UTC-полночь дня, когда последний раз инкрементили days
 }
 
-// ⚠️ Если хотите «чистый старт», можно временно поднять версию ключа:
-// const KEY = 'monadfam:v2'
 const KEY = 'monadfam:v1'
 
 // безопасный клон
@@ -49,27 +54,27 @@ export function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v))
 }
 
-// --- DEMO (добавили статусы на нескольких пользователях)
+// --- DEMO пул (статусы есть, чтобы проверить фильтрацию)
 const demoUsers: Row[] = [
-  { id: 101, name: 'Nik',   handle: '@user1', avatarUrl: 'https://unavatar.io/x/user1', days: 0, statusMode: 'online' },
-  { id: 102, name: 'Lena',  handle: '@user2', avatarUrl: 'https://unavatar.io/x/user2', days: 0, statusMode: 'short' }, // не появится
-  { id: 103, name: 'Alex',  handle: '@user3', avatarUrl: 'https://unavatar.io/x/user3', days: 0, statusMode: 'long'  }, // не появится
-  { id: 104, name: 'Vlad',  handle: '@user4', avatarUrl: 'https://unavatar.io/x/user4', days: 0, statusMode: 'online' },
+  { id: 101, name: 'Nik',   handle: '@user1', avatarUrl: 'https://unavatar.io/x/user1', days: 5, statusMode: 'online', votesUp: 12, votesDown: 3 },
+  { id: 102, name: 'Lena',  handle: '@user2', avatarUrl: 'https://unavatar.io/x/user2', days: 7, statusMode: 'short',  votesUp: 5,  votesDown: 1 },
+  { id: 103, name: 'Alex',  handle: '@user3', avatarUrl: 'https://unavatar.io/x/user3', days: 9, statusMode: 'long',   votesUp: 20, votesDown: 15 },
+  { id: 104, name: 'Vlad',  handle: '@user4', avatarUrl: 'https://unavatar.io/x/user4', days: 3, statusMode: 'online', votesUp: 2,  votesDown: 0 },
 ]
 const seedMutual: Row[] = [
-  { id: 1, name: 'name', handle: '@alice', days: 0, avatarUrl: 'https://unavatar.io/x/alice' },
-  { id: 2, name: 'name', handle: '@bob',   days: 0, avatarUrl: 'https://unavatar.io/x/bob'   },
+  { id: 1, name: 'name', handle: '@alice', days: 6, avatarUrl: 'https://unavatar.io/x/alice', votesUp: 30, votesDown: 4 },
+  { id: 2, name: 'name', handle: '@bob',   days: 2, avatarUrl: 'https://unavatar.io/x/bob',   votesUp: 3,  votesDown: 0 },
 ]
 const seedAwaitTheir: Row[] = [
-  { id: 3, name: 'name', handle: '@carol', days: 2, avatarUrl: 'https://unavatar.io/x/carol' },
-  { id: 4, name: 'name', handle: '@dave',  days: 5, avatarUrl: 'https://unavatar.io/x/dave'  },
+  { id: 3, name: 'name', handle: '@carol', days: 5, avatarUrl: 'https://unavatar.io/x/carol', votesUp: 1, votesDown: 12 },
+  { id: 4, name: 'name', handle: '@dave',  days: 1, avatarUrl: 'https://unavatar.io/x/dave',  votesUp: 0, votesDown: 0 },
 ]
 const seedAwaitOurs: Row[] = [
-  { id: 5, name: 'name', handle: '@erin',  days: 1, avatarUrl: 'https://unavatar.io/x/erin'  },
-  { id: 6, name: 'name', handle: '@frank', days: 6, avatarUrl: 'https://unavatar.io/x/frank' },
+  { id: 5, name: 'name', handle: '@erin',  days: 4, avatarUrl: 'https://unavatar.io/x/erin',  votesUp: 0, votesDown: 0 },
+  { id: 6, name: 'name', handle: '@frank', days: 6, avatarUrl: 'https://unavatar.io/x/frank', votesUp: 10, votesDown: 1 },
 ]
 
-// ===== helpers для календарного месяца (UTC)
+// ===== время (UTC-месяц и UTC-день)
 export function startOfMonthUTC(ts: number) {
   const d = new Date(ts)
   const y = d.getUTCFullYear(), m = d.getUTCMonth()
@@ -84,6 +89,11 @@ export function nextMonthStartFrom(ts: number) {
   const d = new Date(ts)
   const y = d.getUTCFullYear(), m = d.getUTCMonth()
   return Date.UTC(y, m + 1, 1, 0, 0, 0, 0)
+}
+const MS_DAY = 24 * 60 * 60 * 1000
+export function startOfDayUTC(ts: number) {
+  const d = new Date(ts)
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0)
 }
 
 export function defaultState(): AppState {
@@ -102,22 +112,24 @@ export function defaultState(): AppState {
     tutorialDone: false,
     homePool: demoUsers,
     homeIndex: 0,
+    lastDaysAt: startOfDayUTC(now),
   }
 }
 
-// ---- нормализация старых данных из localStorage
+// ---- нормализация/санитизация
 function sanitizeRow(x: any): Row {
   const rawStatus = x?.statusMode
-  const statusMode: StatusMode | undefined =
-    rawStatus === 'online' || rawStatus === 'short' || rawStatus === 'long' ? rawStatus : undefined
-
+  const statusMode: StatusMode | undefined = rawStatus === 'online' || rawStatus === 'short' || rawStatus === 'long' ? rawStatus : undefined
   return {
     id: Number(x?.id ?? Math.floor(Math.random() * 1e9)),
     name: String(x?.name ?? x?.username ?? 'user'),
     handle: String(x?.handle ?? x?.at ?? '@user'),
     avatarUrl: typeof x?.avatarUrl === 'string' ? x.avatarUrl : undefined,
-    days: Number(x?.days ?? 0),
+    days: Number.isFinite(x?.days) ? Number(x.days) : 0,
     statusMode,
+    votesUp: Number.isFinite(x?.votesUp) ? Number(x.votesUp) : 0,
+    votesDown: Number.isFinite(x?.votesDown) ? Number(x.votesDown) : 0,
+    myVote: x?.myVote === 'up' || x?.myVote === 'down' ? x.myVote : undefined,
   }
 }
 function sanitizeLists(x: any): Lists {
@@ -151,19 +163,38 @@ function normalizeStatus(st: Status): Status {
   return ns
 }
 
+// ——— инкремент days раз в новые календарные сутки (UTC)
+function bumpDaysIfNeeded(s: AppState): AppState {
+  const today = startOfDayUTC(Date.now())
+  const last  = s.lastDaysAt ?? today
+  const delta = Math.max(0, Math.floor((today - last) / MS_DAY))
+  if (delta <= 0) return s
+  const inc = (list: Row[]) => list.map(r => ({ ...r, days: (r.days ?? 0) + delta }))
+  return {
+    ...s,
+    lists: {
+      mutual: inc(s.lists.mutual),
+      await_their: inc(s.lists.await_their),
+      await_ours: inc(s.lists.await_ours),
+    },
+    lastDaysAt: today,
+  }
+}
+
 export function loadState(): AppState {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return defaultState()
     const parsed = JSON.parse(raw)
-    const s: AppState = {
+    let s: AppState = {
       ...defaultState(),
       ...parsed,
       lists: sanitizeLists(parsed?.lists),
       status: normalizeStatus(parsed?.status ?? defaultState().status),
-      // если в старых данных нет статусов у homePool — дефолт «online»
       homePool: Array.isArray(parsed?.homePool) ? parsed.homePool.map(sanitizeRow) : defaultState().homePool,
+      lastDaysAt: Number.isFinite(parsed?.lastDaysAt) ? Number(parsed.lastDaysAt) : defaultState().lastDaysAt,
     }
+    s = bumpDaysIfNeeded(s)
     return s
   } catch {
     return defaultState()
@@ -171,12 +202,12 @@ export function loadState(): AppState {
 }
 export function saveState(s: AppState) { localStorage.setItem(KEY, JSON.stringify(s)) }
 
-// ——— Общая проверка доступности пользователя для «голосования»
+// ——— доступность профиля для показа на главной (онлайн)
 function isRowAvailable(r: Row) {
   return (r.statusMode ?? 'online') === 'online'
 }
 
-// Home helpers (мутирующая версия — для «принять решение и перейти к следующему»)
+// Home helpers
 export function takeNextFromPool(s: AppState): Row | null {
   const allIds = new Set([
     ...s.lists.mutual.map(r => r.id),
@@ -196,8 +227,6 @@ export function takeNextFromPool(s: AppState): Row | null {
 export function advancePool(s: AppState) {
   s.homeIndex = (s.homeIndex + 1) % s.homePool.length
 }
-
-// «Подсмотреть» кандидата БЕЗ мутаций индекса (для рендера)
 export function peekNextFromPool(s: AppState): Row | null {
   const allIds = new Set([
     ...s.lists.mutual.map(r => r.id),
@@ -212,4 +241,23 @@ export function peekNextFromPool(s: AppState): Row | null {
     }
   }
   return null
+}
+
+// ——— голосование/рейтинг (байесовская сглаженная доля)
+const PRIOR_UP = 20   // чем больше, тем менее чувствителен к мелким минусам
+const PRIOR_DN = 5
+export function rating01(r: Row): number {
+  const up = Math.max(0, r.votesUp ?? 0)
+  const dn = Math.max(0, r.votesDown ?? 0)
+  const v  = (up + PRIOR_UP) / (up + dn + PRIOR_UP + PRIOR_DN) // 0..1
+  return v
+}
+export function ratingPercent(r: Row): number {
+  return Math.round(rating01(r) * 100) // 0..100
+}
+export function ratingColor(r: Row): string {
+  // от красного к зелёному по hue 0..120
+  const pct = rating01(r)
+  const hue = Math.round(120 * pct)
+  return `hsl(${hue} 70% 50%)`
 }
