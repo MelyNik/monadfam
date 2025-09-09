@@ -1,6 +1,9 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { AppState, Row, loadState, saveState, clone } from '../../lib/state'
+import {
+  AppState, Row, loadState, saveState, clone,
+  startOfMonthUTC, nextMonthStartFrom
+} from '../../lib/state'
 
 const MS30D = 30 * 24 * 60 * 60 * 1000
 
@@ -13,13 +16,6 @@ function fmtLeft(ms: number) {
   return d > 0 ? `${d}d ${h}h ${m}m` : `${h}:${m}:${s}`
 }
 
-function nextMonthStartUTC() {
-  const now = new Date()
-  const y = now.getUTCFullYear(), m = now.getUTCMonth()
-  return Date.UTC(y, m + 1, 1, 0, 0, 0, 0)
-}
-
-
 const yourAvatar     = 'https://unavatar.io/x/your_handle'
 const selectedAvatar = 'https://unavatar.io/x/selected_user'
 
@@ -29,56 +25,57 @@ export default function ProfilePage(){
   const [state, setState] = useState<AppState>(() => loadState())
   const [tab, setTab]     = useState<Tab>('mutual')
   const [q, setQ]         = useState('')
-const qNorm = q.toLowerCase().replace(/^@/, '')
-const match = (r: Row) => {
-  const h = (r.handle || '').toLowerCase().replace(/^@/, '')
-  const n = (r.name   || '').toLowerCase()
-  return h.includes(qNorm) || n.includes(qNorm)
-}
+  const qNorm = q.toLowerCase().replace(/^@/, '')
+  const match = (r: Row) => {
+    const h = (r.handle || '').toLowerCase().replace(/^@/, '')
+    const n = (r.name   || '').toLowerCase()
+    return h.includes(qNorm) || n.includes(qNorm)
+  }
 
-  // загрузка состояния + тиканье short-таймера
+  // «тик» для UI, чтобы таймеры обновлялись каждый секунду
+  const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-  const t = setInterval(() => {
-    setState(prev => {
-      const ns = clone(prev)
-      let changed = false
-      const now = Date.now()
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
 
-      // 1) Short истёк → выйти в online
-      if (ns.status.mode === 'short' && ns.status.shortUntil && now >= ns.status.shortUntil) {
-        ns.status.mode = 'online'
-        ns.status.shortUntil = undefined
-        changed = true
-      }
+  // служебные таймеры: истечение short, ресет short в первый день месяца, ресет long через 30 дней
+  useEffect(() => {
+    const t = setInterval(() => {
+      setState(prev => {
+        const ns = clone(prev)
+        let changed = false
+        const nowTs = Date.now()
 
-      // 2) Short попытки восстановить в первый день НОВОГО календарного месяца
-      //    (когда попыток нет и наступило nextMonthStartUTC)
-      if (ns.status.shortLeft <= 0) {
-        const next = nextMonthStartUTC()
-        if (now >= next) {
-          ns.status.shortLeft = 4
-          // фиксируем месяц, чтобы не восстанавливать повторно
-          ns.status.shortMonthStart = next
+        // 1) Short истёк → выйти в online
+        if (ns.status.mode === 'short' && ns.status.shortUntil && nowTs >= ns.status.shortUntil) {
+          ns.status.mode = 'online'
+          ns.status.shortUntil = undefined
           changed = true
         }
-      }
 
-      // 3) Long восстановить через 30 дней после выхода из long (longResetAt)
-      if (ns.status.longLeft <= 0 && ns.status.longResetAt && now >= ns.status.longResetAt) {
-        ns.status.longLeft = 1
-        ns.status.longResetAt = undefined
-        changed = true
-      }
+        // 2) Первый день НОВОГО месяца относительно shortMonthStart → вернуть 4 попытки
+        const lastMonthStart = ns.status.shortMonthStart ?? startOfMonthUTC(nowTs)
+        const nextBoundary   = nextMonthStartFrom(lastMonthStart)
+        if (nowTs >= nextBoundary) {
+          ns.status.shortLeft = 4
+          ns.status.shortMonthStart = nextBoundary
+          changed = true
+        }
 
-      if (changed) saveState(ns)
-      return changed ? ns : prev
-    })
-  }, 1000)
+        // 3) Long восстановить через 30 дней после выхода
+        if (ns.status.longLeft <= 0 && ns.status.longResetAt && nowTs >= ns.status.longResetAt) {
+          ns.status.longLeft = 1
+          ns.status.longResetAt = undefined
+          changed = true
+        }
 
-  return () => clearInterval(t)
-}, [])
-
-
+        if (changed) saveState(ns)
+        return changed ? ns : prev
+      })
+    }, 1000)
+    return () => clearInterval(t)
+  }, [])
 
   const lists   = state.lists
   const removed = state.removed
@@ -145,68 +142,73 @@ const match = (r: Row) => {
   }
 
   // ===== статусы
-  // ===== статусы
-const toOnline = () => {
-  const ns = clone(state)
-  if (ns.status.mode === 'long') {
-    // Выход из long → запустить 30-дневный таймер восстановления
-    ns.status.longActive = false
-    ns.status.longResetAt = Date.now() + MS30D
-  }
-  ns.status.mode = 'online'
-  ns.status.shortUntil = undefined
-  write(ns)
-}
-
-const activateShort = () => {
-  const ns = clone(state)
-  // если были в long и переключаемся в short — это тоже "выход" из long
-  if (ns.status.mode === 'long') {
-    ns.status.longActive = false
-    ns.status.longResetAt = Date.now() + MS30D
-  }
-  if (ns.status.mode === 'short') return
-  if (ns.status.shortLeft <= 0) { alert('No short absences left this month'); return }
-  const TWO_DAYS = 2 * 24 * 60 * 60 * 1000
-  ns.status.mode = 'short'
-  ns.status.shortLeft -= 1
-  ns.status.shortUntil = Date.now() + TWO_DAYS
-  write(ns)
-}
-
-const toggleLong = () => {
-  const ns = clone(state)
-  if (ns.status.mode === 'long') {
-    // Выходим из long → старт 30-дневного восстановления
+  const toOnline = () => {
+    const ns = clone(state)
+    if (ns.status.mode === 'long') {
+      // Выход из long → запустить 30-дневный таймер восстановления
+      ns.status.longActive = false
+      ns.status.longResetAt = Date.now() + MS30D
+    }
     ns.status.mode = 'online'
-    ns.status.longActive = false
-    ns.status.longResetAt = Date.now() + MS30D
+    ns.status.shortUntil = undefined
     write(ns)
-    return
   }
-  if (ns.status.longLeft <= 0) {
-    alert('No long absence left right now')
-    return
+
+  const activateShort = () => {
+    const ns = clone(state)
+    // если были в long и переключаемся в short — это тоже "выход" из long
+    if (ns.status.mode === 'long') {
+      ns.status.longActive = false
+      ns.status.longResetAt = Date.now() + MS30D
+    }
+    if (ns.status.mode === 'short') return
+    if (ns.status.shortLeft <= 0) { alert('No short absences left this month'); return }
+    const TWO_DAYS = 2 * 24 * 60 * 60 * 1000
+    ns.status.mode = 'short'
+    ns.status.shortLeft -= 1
+    ns.status.shortUntil = Date.now() + TWO_DAYS
+    write(ns)
   }
-  // Входим в long
-  ns.status.mode = 'long'
-  ns.status.longActive = true
-  ns.status.longUsedAt = Date.now()
-  ns.status.longLeft -= 1
-  write(ns)
-}
 
+  const toggleLong = () => {
+    const ns = clone(state)
+    if (ns.status.mode === 'long') {
+      // Выходим из long → старт 30-дневного восстановления
+      ns.status.mode = 'online'
+      ns.status.longActive = false
+      ns.status.longResetAt = Date.now() + MS30D
+      write(ns)
+      return
+    }
+    if (ns.status.longLeft <= 0) {
+      alert('No long absence left right now')
+      return
+    }
+    // Входим в long
+    ns.status.mode = 'long'
+    ns.status.longActive = true
+    ns.status.longUsedAt = Date.now()
+    ns.status.longLeft -= 1
+    write(ns)
+  }
 
-  // безопасный обратный таймер (если не short — пусто)
+  // обратный таймер паузы short (тик за счёт now)
   const shortCountdown = useMemo(() => {
-    if (!state || state.status.mode !== 'short' || !state.status.shortUntil) return ''
-    const left = Math.max(0, state.status.shortUntil - Date.now())
+    if (state.status.mode !== 'short' || !state.status.shortUntil) return ''
+    const left = Math.max(0, state.status.shortUntil - now)
     const sec  = Math.floor(left / 1000)
     const h = Math.floor(sec / 3600).toString().padStart(2, '0')
     const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0')
     const s = Math.floor(sec % 60).toString().padStart(2, '0')
     return `${h}:${m}:${s}`
-  }, [state])
+  }, [state.status.mode, state.status.shortUntil, now])
+
+  // время до сброса short-попыток (если попыток 0)
+  const shortRestoreIn = useMemo(() => {
+    const base = state.status.shortMonthStart ?? startOfMonthUTC(now)
+    const next = nextMonthStartFrom(base)
+    return Math.max(0, next - now)
+  }, [state.status.shortMonthStart, now])
 
   const tabBtn = (kind: Tab, label: string, count: number) => {
     const active = tab === kind ? 'bg-white/10' : ''
@@ -227,35 +229,34 @@ const toggleLong = () => {
         <button className="px-4 py-2 rounded-xl bg-white/15" onClick={toOnline}>Online</button>
 
         {/* SHORT */}
-<button
-  onClick={activateShort}
-  className={`px-4 py-2 rounded-xl ${state.status.mode === 'short' ? 'bg-green-600/30' : 'bg-white/10'}`}
-  title="Short absence: up to 2 days"
->
-  {state.status.mode === 'short'
-    ? `Pause · ${shortCountdown}`
-    : (state.status.shortLeft > 0
-        ? `Short absence · ${state.status.shortLeft} left`
-        : `Short absence · restores in ${fmtLeft(nextMonthStartUTC() - Date.now())}`
-      )
-  }
-</button>
+        <button
+          onClick={activateShort}
+          className={`px-4 py-2 rounded-xl ${state.status.mode === 'short' ? 'bg-green-600/30' : 'bg-white/10'}`}
+          title="Short absence: up to 2 days"
+        >
+          {state.status.mode === 'short'
+            ? `Pause · ${shortCountdown}`
+            : (state.status.shortLeft > 0
+                ? `Short absence · ${state.status.shortLeft} left`
+                : `Short absence · restores in ${fmtLeft(shortRestoreIn)}`
+              )
+          }
+        </button>
 
-{/* LONG */}
-<button
-  onClick={toggleLong}
-  className={`px-4 py-2 rounded-xl ${state.status.mode === 'long' ? 'bg-red-600/30' : 'bg-white/10'}`}
-  title="Long absence: one per 30 days after finish"
->
-  {state.status.mode === 'long'
-    ? 'Stop'
-    : (state.status.longLeft > 0
-        ? `Long absence · ${state.status.longLeft} left`
-        : `Long absence · restores in ${fmtLeft(Math.max(0, (state.status.longResetAt ?? 0) - Date.now()))}`
-      )
-  }
-</button>
-
+        {/* LONG */}
+        <button
+          onClick={toggleLong}
+          className={`px-4 py-2 rounded-xl ${state.status.mode === 'long' ? 'bg-red-600/30' : 'bg-white/10'}`}
+          title="Long absence: one per 30 days after finish"
+        >
+          {state.status.mode === 'long'
+            ? 'Stop'
+            : (state.status.longLeft > 0
+                ? `Long absence · ${state.status.longLeft} left`
+                : `Long absence · restores in ${fmtLeft(Math.max(0, (state.status.longResetAt ?? 0) - now))}`
+              )
+          }
+        </button>
 
         <div className="grow" />
         <button onClick={restoreRemoved} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
@@ -315,14 +316,13 @@ const toggleLong = () => {
                   {/* RIGHT: actions */}
                   <div className="flex items-center gap-2">
                     <a
-  className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
-  href={`https://x.com/${r.handle.replace(/^@/, '')}`}
-  target="_blank"
-  rel="noopener noreferrer"
->
-  Open in X
-</a>
-
+                      className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+                      href={`https://x.com/${(r.handle || '').replace(/^@/, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open in X
+                    </a>
 
                     {tab === 'mutual' && (
                       <button onClick={() => unfollowFromMutual(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">
