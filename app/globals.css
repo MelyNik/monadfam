@@ -59,25 +59,39 @@ body {
 
 /* ===== Полоса рейтинга (универсальная) =====
    Использование: <div class="rating-bar" style="--rating-fill: 62%"></div>
-   где --rating-fill — ширина заполнения (0..100%). */
+   --rating-fill — процент заполнения (0..100). */
 .rating-bar {
   position: relative;
-  height: 0.5rem;                 /* h-2 */
+  height: 0.5rem;
   border-radius: 9999px;
-  background: #ffffff18;          /* фон под полосой */
+  background: #ffffff18;
   overflow: hidden;
 }
+
+/* Фоновая «радуга» на всей длине — красный справа есть всегда */
 .rating-bar::before {
   content: "";
   position: absolute; inset: 0;
   background: var(--rating-gradient);
-  /* ключ: растягиваем сам градиент на ширину заполнения,
-     чтобы в конце заполнения всегда был красный, а слева зелёный */
-  background-size: var(--rating-fill, 50%) 100%;
-  background-repeat: no-repeat;
-  border-radius: inherit;
-  transition: background-size .2s ease;
 }
+
+/* Мягкая маска справа: плавный переход без «ступеньки» */
+.rating-bar::after {
+  content: "";
+  position: absolute; inset: 0;
+  /* 1-й слой: лёгкое перо ~10px к точке заполнения
+     2-й слой: затемнение правой части после точки заполнения */
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0,
+      transparent calc(var(--rating-fill, 50%) - 10px),
+      rgba(0,0,0,.40) calc(var(--rating-fill, 50%)),
+      rgba(0,0,0,.40) 100%
+    );
+  transition: background .2s ease;
+}
+
 
 /* ===== Кольца вокруг аватаров ===== */
 
