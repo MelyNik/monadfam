@@ -23,7 +23,7 @@
 
   /* === Плавные градиенты рейтинга ===
      Полосы: ЗЕЛЕНЫЙ слева → КРАСНЫЙ справа (мягкие переходы)
-     Кольца: конусный градиент, с ориентацией «слева зелёный / справа красный» */
+     Кольца: шов СВЕРХУ (12 часов), слева зелёный/справа красный */
   --rating-gradient: linear-gradient(
     90deg,
     #22c55e 0%,
@@ -35,7 +35,7 @@
     #ef4444 100%
   );
   --rating-conic: conic-gradient(
-    from 270deg,
+    from 270deg,          /* шов сверху */
     #22c55e 0deg,
     #34d399 90deg,
     #eab308 180deg,
@@ -59,8 +59,8 @@ body {
 .btn   { border-radius: 0.9rem; padding: 0.6rem 1rem; }
 
 /* ===== Полоса рейтинга (универсальная) =====
-   Использование: <div class="rating-bar" style="--rating-mask: {100 - value}%"></div>
-   где value — процент рейтинга (0..100). */
+   Использование: <div class="rating-bar" style="--value: 65%"></div>
+   где --value — процент (0..100). */
 .rating-bar {
   position: relative;
   height: 0.5rem;                 /* h-2 */
@@ -68,18 +68,13 @@ body {
   background: #ffffff18;          /* фон под полосой */
   overflow: hidden;
 }
-.rating-bar::before {
-  /* сама «радуга» — плавная */
+/* Показываем ГРАДИЕНТ, обрезая его справа — без затемнений и ступенек */
+.rating-bar::after {
   content: "";
   position: absolute; inset: 0;
   background: var(--rating-gradient);
-}
-.rating-bar::after {
-  /* маска: закрываем ПРАВУЮ часть, чтобы уровень шёл слева направо */
-  content: "";
-  position: absolute; top: 0; bottom: 0; right: 0;
-  width: var(--rating-mask, 50%); /* по умолчанию 50% на всякий случай */
-  background: rgba(0,0,0,0.4);
+  /* видна только левая часть до процента */
+  clip-path: inset(0 calc(100% - var(--value, 50%)) 0 0);
 }
 
 /* ===== Тонкие цветные кольца вокруг аватаров (плавные) ===== */

@@ -36,14 +36,10 @@ function statusBadge(r: Row) {
   return { label: 'лонг', className: 'bg-red-600/25 text-red-300' }
 }
 
-const ThumbUp = (props:any) => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" {...props}>
+/* ОДИНАКОВЫЙ кулак — вниз просто поворачиваем */
+const Thumb = ({ rotate = 0 }: { rotate?: number }) => (
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style={{ transform: `rotate(${rotate}deg)` }}>
     <path d="M2 10h4v12H2V10zm6 12h8a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4.5l1-4.5V5a2 2 0 0 0-2-2l-4 8v11z"/>
-  </svg>
-)
-const ThumbDown = (props:any) => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" {...props}>
-    <path d="M22 14h-4V2h4v12zM8 2H0v7a2 2 0 0 0 2 2h4.5l-1 4.5V19a2 2 0 0 0 2 2l4-8V2z"/>
   </svg>
 )
 
@@ -60,6 +56,7 @@ export default function ProfilePage(){
     return h.includes(qNorm) || n.includes(qNorm)
   }
 
+  /* тиканье статусов/восстановлений */
   useEffect(() => {
     const t = setInterval(() => {
       setState(prev => {
@@ -322,7 +319,7 @@ export default function ProfilePage(){
                     </div>
                   </div>
 
-                  {/* MIDDLE: кнопки голосования как на макете */}
+                  {/* MIDDLE: голосование — зелёная/красная + ! между ними */}
                   <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
                     {(tab !== 'await_ours') && (
                       <>
@@ -335,9 +332,20 @@ export default function ProfilePage(){
                             ${can ? 'bg-green-500/25 hover:bg-green-500/35' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
                           style={{ width: 82, height: 34 }}
                         >
-                          <ThumbUp />
+                          <Thumb />
                         </button>
-                        {/* ПРОТИВ */}
+
+                        {/* знак «!» ПО СЕРЕДИНЕ — всегда */}
+                        <div className="relative group inline-block">
+                          <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
+                          <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
+                            {can
+                              ? 'You can vote on Tue & Sat. One vote per user.'
+                              : (whyDisabled || 'Voting is unavailable')}
+                          </div>
+                        </div>
+
+                        {/* ПРОТИВ (тот же кулак, повернут вниз) */}
                         <button
                           disabled={!can}
                           title={can ? 'Vote against' : undefined}
@@ -346,17 +354,8 @@ export default function ProfilePage(){
                             ${can ? 'bg-red-500/25 hover:bg-red-500/35' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
                           style={{ width: 82, height: 34 }}
                         >
-                          <ThumbDown />
+                          <Thumb rotate={180} />
                         </button>
-
-                        {!can && (
-                          <div className="relative group inline-block">
-                            <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
-                            <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
-                              {whyDisabled || 'Voting is unavailable'}
-                            </div>
-                          </div>
-                        )}
                       </>
                     )}
                   </div>
