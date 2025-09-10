@@ -22,20 +22,21 @@
   --ring-sm-inner: 1.5px;
 
   /* === Плавные градиенты рейтинга ===
-     Полосы: зелёный → жёлтый → красный (очень мягко)
+     Полосы: зелёный → жёлтый → оранжевый → красный (широкий мягкий переход)
      Кольца: конусный градиент, шов сверху */
   --rating-gradient: linear-gradient(
-  90deg,
-  #22c55e 0%,
-  #34d399 16%,
-  #a3e635 28%,
-  #eab308 50%,
-  #f59e0b 66%,
-  #fb923c 80%,
-  #f97316 86%,
-  #f87171 92%,
-  #ef4444 100%
-);
+    90deg,
+    #22c55e 0%,
+    #34d399 16%,
+    #a3e635 28%,
+    #eab308 50%,
+    #f59e0b 66%,
+    #fb923c 80%,
+    #f97316 86%,
+    #f87171 92%,
+    #ef4444 100%
+  );
+
   --rating-conic: conic-gradient(
     from 270deg,
     #22c55e 0deg,
@@ -46,6 +47,23 @@
   );
 
   --ring-colors: var(--rating-conic);
+}
+
+/* Progressive enhancement: ещё более гладкий переход в OKLab, если поддерживается */
+@supports (color: oklch(0 0 0)) {
+  :root {
+    --rating-gradient: linear-gradient(
+      in oklab 90deg,
+      oklch(0.82 0.17 145) 0%,
+      oklch(0.82 0.16 120) 24%,
+      oklch(0.82 0.15 100) 38%,
+      oklch(0.80 0.15  90) 50%,
+      oklch(0.77 0.16  60) 66%,
+      oklch(0.72 0.20  40) 82%,
+      oklch(0.66 0.23  25) 92%,
+      oklch(0.62 0.24  25) 100%
+    );
+  }
 }
 
 html, body { height: 100%; }
@@ -59,38 +77,41 @@ body {
 .input { background: rgba(255,255,255,0.08); border: 1px solid var(--border); border-radius: 0.75rem; padding: 0.6rem 0.8rem; }
 .btn   { border-radius: 0.9rem; padding: 0.6rem 1rem; }
 
-/* ===== Полоса рейтинга (универсальная) =====
+/* ===== Полоса рейтинга =====
    Использование: <div class="rating-bar" style="--rating-fill: 62%"></div>
-   --rating-fill — процент заполнения (0..100). */
-/* как и было */
-.rating-bar{
-  position:relative;height:0.5rem;border-radius:9999px;background:#ffffff18;overflow:hidden;
+   где --rating-fill — процент заполнения (0..100). */
+.rating-bar {
+  position: relative;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: #ffffff18;
+  overflow: hidden;
 }
-/* градиент ВСЕГДА на всю ширину */
-.rating-bar::before{
-  content:"";position:absolute;inset:0;background:var(--rating-gradient);
+
+/* градиент всегда на всю ширину */
+.rating-bar::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: var(--rating-gradient);
 }
-/* нежное затемнение после уровня, НЕ маска-прозрачность */
-.rating-bar::after{
-  content:""; pointer-events:none; position:absolute; inset:0;
-  /* feather ≈ 26px вокруг точки заполнения */
+
+/* мягкое «перо» после точки заполнения (без жёсткой ступеньки) */
+.rating-bar::after {
+  content: "";
+  pointer-events: none;
+  position: absolute; inset: 0;
   background:
     linear-gradient(
       90deg,
       transparent 0,
-      transparent calc(var(--rating-fill,50%) - 26px),
-      rgba(12,12,18,.20) calc(var(--rating-fill,50%) - 18px),
-      rgba(12,12,18,.40) calc(var(--rating-fill,50%) - 10px),
-      rgba(12,12,18,.60) var(--rating-fill,50%),
-      rgba(12,12,18,.60) 100%
+      transparent calc(var(--rating-fill, 50%) - 26px),
+      rgba(12,12,18,.20) calc(var(--rating-fill, 50%) - 18px),
+      rgba(12,12,18,.40) calc(var(--rating-fill, 50%) - 10px),
+      rgba(12,12,18,.58) var(--rating-fill, 50%),
+      rgba(12,12,18,.58) 100%
     );
   transition: background .15s ease;
 }
-
-
-/* УДАЛИ старый ::after с затемнением — он и создавал ступеньку */
-
-
 
 /* ===== Кольца вокруг аватаров ===== */
 

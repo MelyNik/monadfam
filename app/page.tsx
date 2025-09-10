@@ -7,7 +7,7 @@ import {
 
 function RatingBar({ value = 50 }: { value?: number }) {
   const pct = `${Math.max(0, Math.min(100, value))}%`
-  return <div className="rating-bar" style={{ ['--rating-fill' as any]: pct }} />
+  return <div className="rating-bar" style={{ ['--rating-fill' as any]: `${rPct}%` }} />
 }
 
 
