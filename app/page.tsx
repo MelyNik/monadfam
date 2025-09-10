@@ -7,9 +7,8 @@ import {
 
 function RatingBar({ value = 50 }: { value?: number }) {
   const pct = `${Math.max(0, Math.min(100, value))}%`
-  return <div className="rating-bar" style={{ ['--rating-fill' as any]: `${rPct}%` }} />
+  return <div className="rating-bar" style={{ ['--rating-fill' as any]: pct }} />
 }
-
 
 export default function HomePage() {
   const [state, setState] = useState<AppState | null>(null)
