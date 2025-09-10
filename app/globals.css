@@ -13,17 +13,17 @@
   --muted:    rgba(255,255,255,0.7);
 
   /* Размеры аватаров и колец */
-  --avatar-xl: 300px;       /* большой аватар слева/справа */
-  --ring-xl: 3px;           /* толщина цветного кольца (большой) */
-  --ring-xl-inner: 2px;     /* тонкая внутренняя кайма */
+  --avatar-xl: 300px;
+  --ring-xl: 3px;
+  --ring-xl-inner: 2px;
 
-  --avatar-sm: 44px;        /* маленький аватар в строках */
-  --ring-sm: 2px;           /* кольцо (маленький) */
+  --avatar-sm: 44px;
+  --ring-sm: 2px;
   --ring-sm-inner: 1.5px;
 
   /* === Плавные градиенты рейтинга ===
-     Полосы: ЗЕЛЕНЫЙ слева → КРАСНЫЙ справа (мягкие переходы)
-     Кольца: шов СВЕРХУ (12 часов), слева зелёный/справа красный */
+     Полосы: зелёный → жёлтый → красный (очень мягко)
+     Кольца: конусный градиент, шов сверху */
   --rating-gradient: linear-gradient(
     90deg,
     #22c55e 0%,
@@ -35,7 +35,7 @@
     #ef4444 100%
   );
   --rating-conic: conic-gradient(
-    from 270deg,          /* шов сверху */
+    from 270deg,
     #22c55e 0deg,
     #34d399 90deg,
     #eab308 180deg,
@@ -43,7 +43,6 @@
     #ef4444 360deg
   );
 
-  /* Совместимость со старыми классами колец */
   --ring-colors: var(--rating-conic);
 }
 
@@ -59,8 +58,8 @@ body {
 .btn   { border-radius: 0.9rem; padding: 0.6rem 1rem; }
 
 /* ===== Полоса рейтинга (универсальная) =====
-   Использование: <div class="rating-bar" style="--value: 65%"></div>
-   где --value — процент (0..100). */
+   Использование: <div class="rating-bar" style="--rating-fill: 62%"></div>
+   где --rating-fill — ширина заполнения (0..100%). */
 .rating-bar {
   position: relative;
   height: 0.5rem;                 /* h-2 */
@@ -68,16 +67,19 @@ body {
   background: #ffffff18;          /* фон под полосой */
   overflow: hidden;
 }
-/* Показываем ГРАДИЕНТ, обрезая его справа — без затемнений и ступенек */
-.rating-bar::after {
+.rating-bar::before {
   content: "";
   position: absolute; inset: 0;
   background: var(--rating-gradient);
-  /* видна только левая часть до процента */
-  clip-path: inset(0 calc(100% - var(--value, 50%)) 0 0);
+  /* ключ: растягиваем сам градиент на ширину заполнения,
+     чтобы в конце заполнения всегда был красный, а слева зелёный */
+  background-size: var(--rating-fill, 50%) 100%;
+  background-repeat: no-repeat;
+  border-radius: inherit;
+  transition: background-size .2s ease;
 }
 
-/* ===== Тонкие цветные кольца вокруг аватаров (плавные) ===== */
+/* ===== Кольца вокруг аватаров ===== */
 
 /* большой аватар */
 .avatar-ring-xl       { background: var(--ring-colors); padding: var(--ring-xl); border-radius: 9999px; display: inline-grid; }

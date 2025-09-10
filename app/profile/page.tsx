@@ -36,10 +36,10 @@ function statusBadge(r: Row) {
   return { label: 'лонг', className: 'bg-red-600/25 text-red-300' }
 }
 
-/* ОДИНАКОВЫЙ кулак — вниз просто поворачиваем */
-const Thumb = ({ rotate = 0 }: { rotate?: number }) => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style={{ transform: `rotate(${rotate}deg)` }}>
-    <path d="M2 10h4v12H2V10zm6 12h8a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4.5l1-4.5V5a2 2 0 0 0-2-2l-4 8v11z"/>
+/* Один и тот же знак «палец», для down — просто поворот (визуально идентичные) */
+const Thumb = (props:any) => (
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" {...props}>
+    <path d="M2 10h4v12H2V10zm8 12h6a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4l.8-4.2A2 2 0 0 0 10 5l-4 7v10z"/>
   </svg>
 )
 
@@ -56,7 +56,6 @@ export default function ProfilePage(){
     return h.includes(qNorm) || n.includes(qNorm)
   }
 
-  /* тиканье статусов/восстановлений */
   useEffect(() => {
     const t = setInterval(() => {
       setState(prev => {
@@ -210,9 +209,7 @@ export default function ProfilePage(){
             ? `Pause · ${shortCountdown}`
             : (state.status.shortLeft > 0
                 ? `Short absence · ${state.status.shortLeft} left`
-                : `Short absence · restores in ${fmtLeft(shortRestoreIn)}`
-              )
-          }
+                : `Short absence · restores in ${fmtLeft(shortRestoreIn)}`)}
         </button>
 
         <button
@@ -224,22 +221,23 @@ export default function ProfilePage(){
             ? 'Stop'
             : (state.status.longLeft > 0
                 ? `Long absence · ${state.status.longLeft} left`
-                : `Long absence · restores in ${fmtLeft(Math.max(0, (state.status.longResetAt ?? 0) - Date.now()))}`
-              )
-          }
+                : `Long absence · restores in ${fmtLeft(Math.max(0, (state.status.longResetAt ?? 0) - Date.now()))}`)}
         </button>
 
         <div className="grow" />
-        <button onClick={() => {
-          if (!state.removed.length) return
-          const ns = clone(state)
-          state.removed.forEach(({ from, row }) => {
-            if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
-            if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours]
-          })
-          ns.removed = []
-          saveState(ns); setState(ns)
-        }} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
+        <button
+          onClick={() => {
+            if (!state.removed.length) return
+            const ns = clone(state)
+            state.removed.forEach(({ from, row }) => {
+              if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
+              if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours]
+            })
+            ns.removed = []
+            saveState(ns); setState(ns)
+          }}
+          className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15"
+        >
           Restore removed profiles {state.removed.length ? `(${state.removed.length})` : ''}
         </button>
       </div>
@@ -319,7 +317,7 @@ export default function ProfilePage(){
                     </div>
                   </div>
 
-                  {/* MIDDLE: голосование — зелёная/красная + ! между ними */}
+                  {/* MIDDLE: кнопки голосования как на макете */}
                   <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
                     {(tab !== 'await_ours') && (
                       <>
@@ -334,18 +332,7 @@ export default function ProfilePage(){
                         >
                           <Thumb />
                         </button>
-
-                        {/* знак «!» ПО СЕРЕДИНЕ — всегда */}
-                        <div className="relative group inline-block">
-                          <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
-                          <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
-                            {can
-                              ? 'You can vote on Tue & Sat. One vote per user.'
-                              : (whyDisabled || 'Voting is unavailable')}
-                          </div>
-                        </div>
-
-                        {/* ПРОТИВ (тот же кулак, повернут вниз) */}
+                        {/* ПРОТИВ */}
                         <button
                           disabled={!can}
                           title={can ? 'Vote against' : undefined}
@@ -354,8 +341,17 @@ export default function ProfilePage(){
                             ${can ? 'bg-red-500/25 hover:bg-red-500/35' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
                           style={{ width: 82, height: 34 }}
                         >
-                          <Thumb rotate={180} />
+                          <Thumb style={{ transform: 'rotate(180deg)' }} />
                         </button>
+
+                        {!can && (
+                          <div className="relative group inline-block">
+                            <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
+                            <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
+                              {whyDisabled || 'Voting is unavailable'}
+                            </div>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
