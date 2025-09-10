@@ -318,43 +318,46 @@ export default function ProfilePage(){
                   </div>
 
                   {/* MIDDLE: кнопки голосования как на макете */}
-                  <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
-                    {tab !== 'await_ours' && (
-                      <>
-                        {/* ЗА */}
-                        <button
-                          disabled={!can}
-                          title={can ? 'Vote for' : undefined}
-                          onClick={() => vote(r, 'up')}
-                          className={`rounded-2xl flex items-center justify-center
-                            ${can ? 'bg-green-500/25 hover:bg-green-500/35' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
-                          style={{ width: 82, height: 34 }}
-                        >
-                          <Thumb />
-                        </button>
-                        {/* ПРОТИВ (тот же знак, повернули) */}
-                        <button
-                          disabled={!can}
-                          title={can ? 'Vote against' : undefined}
-                          onClick={() => vote(r, 'down')}
-                          className={`rounded-2xl flex items-center justify-center
-                            ${can ? 'bg-red-500/25 hover:bg-red-500/35' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
-                          style={{ width: 82, height: 34 }}
-                        >
-                          <Thumb style={{ transform: 'rotate(180deg)' }} />
-                        </button>
+<div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+  {tab !== 'await_ours' && (
+    <>
+      {/* ЗА (палец вверх) — всегда зелёный фон */}
+      <button
+        disabled={!can}
+        title={can ? 'Vote for' : undefined}
+        onClick={() => vote(r, 'up')}
+        className={`rounded-2xl flex items-center justify-center text-white/90
+          bg-green-500/25 hover:bg-green-500/35 ${!can ? 'opacity-60 cursor-not-allowed' : ''}`}
+        style={{ width: 82, height: 34 }}
+      >
+        <Thumb />
+      </button>
 
-                        {!can && (
-                          <div className="relative group inline-block">
-                            <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
-                            <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
-                              {whyDisabled || 'Voting is unavailable'}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
+      {/* ПРОТИВ (палец вниз) — тот же знак, повернули; всегда красный фон */}
+      <button
+        disabled={!can}
+        title={can ? 'Vote against' : undefined}
+        onClick={() => vote(r, 'down')}
+        className={`rounded-2xl flex items-center justify-center text-white/90
+          bg-red-500/25 hover:bg-red-500/35 ${!can ? 'opacity-60 cursor-not-allowed' : ''}`}
+        style={{ width: 82, height: 34 }}
+      >
+        <Thumb style={{ transform: 'rotate(180deg)' }} />
+      </button>
+
+      {/* Знак пояснения строго между кнопками (виден всегда; тултип — только когда голосовать нельзя) */}
+      <div className="relative group inline-block">
+        <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
+        {!can && (
+          <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
+            {whyDisabled || 'Voting is unavailable'}
+          </div>
+        )}
+      </div>
+    </>
+  )}
+</div>
+
 
                   {/* RIGHT */}
                   <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
