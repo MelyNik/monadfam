@@ -61,36 +61,29 @@ body {
    Использование: <div class="rating-bar" style="--rating-fill: 62%"></div>
    --rating-fill — процент заполнения (0..100). */
 /* как и было */
-.rating-bar {
-  position: relative;
-  height: 0.5rem;
-  border-radius: 9999px;
-  background: #ffffff18; /* трек под полосой */
-  overflow: hidden;
+.rating-bar{
+  position:relative;height:0.5rem;border-radius:9999px;background:#ffffff18;overflow:hidden;
+}
+/* градиент ВСЕГДА на всю ширину */
+.rating-bar::before{
+  content:"";position:absolute;inset:0;background:var(--rating-gradient);
+}
+/* нежное затемнение после уровня, НЕ маска-прозрачность */
+.rating-bar::after{
+  content:"";pointer-events:none;position:absolute;inset:0;
+  background:
+    linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(var(--rating-fill,50%) - 22px),
+      rgba(12,12,18,.25) calc(var(--rating-fill,50%) - 14px),
+      rgba(12,12,18,.45) calc(var(--rating-fill,50%) - 6px),
+      rgba(12,12,18,.65) var(--rating-fill,50%),
+      rgba(12,12,18,.65) 100%
+    );
+  transition:background .15s ease;
 }
 
-/* сам градиент по всей длине */
-.rating-bar::before {
-  content: "";
-  position: absolute; inset: 0;
-  background: var(--rating-gradient);
-  /* мягко растворяем градиент к точке заполнения — НЕТ тёмной шторки */
-  -webkit-mask-image: linear-gradient(
-    to right,
-    #000 0,
-    #000 calc(var(--rating-fill, 50%) - 24px),
-    rgba(0,0,0,0.8) calc(var(--rating-fill, 50%) - 12px),
-    rgba(0,0,0,0) var(--rating-fill, 50%)
-  );
-  mask-image: linear-gradient(
-    to right,
-    #000 0,
-    #000 calc(var(--rating-fill, 50%) - 24px),
-    rgba(0,0,0,0.8) calc(var(--rating-fill, 50%) - 12px),
-    rgba(0,0,0,0) var(--rating-fill, 50%)
-  );
-  transition: mask-image .2s ease;
-}
 
 /* УДАЛИ старый ::after с затемнением — он и создавал ступеньку */
 
