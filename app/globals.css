@@ -60,37 +60,40 @@ body {
 /* ===== Полоса рейтинга (универсальная) =====
    Использование: <div class="rating-bar" style="--rating-fill: 62%"></div>
    --rating-fill — процент заполнения (0..100). */
+/* как и было */
 .rating-bar {
   position: relative;
   height: 0.5rem;
   border-radius: 9999px;
-  background: #ffffff18;
+  background: #ffffff18; /* трек под полосой */
   overflow: hidden;
 }
 
-/* Фоновая «радуга» на всей длине — красный справа есть всегда */
+/* сам градиент по всей длине */
 .rating-bar::before {
   content: "";
   position: absolute; inset: 0;
   background: var(--rating-gradient);
+  /* мягко растворяем градиент к точке заполнения — НЕТ тёмной шторки */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #000 0,
+    #000 calc(var(--rating-fill, 50%) - 24px),
+    rgba(0,0,0,0.8) calc(var(--rating-fill, 50%) - 12px),
+    rgba(0,0,0,0) var(--rating-fill, 50%)
+  );
+  mask-image: linear-gradient(
+    to right,
+    #000 0,
+    #000 calc(var(--rating-fill, 50%) - 24px),
+    rgba(0,0,0,0.8) calc(var(--rating-fill, 50%) - 12px),
+    rgba(0,0,0,0) var(--rating-fill, 50%)
+  );
+  transition: mask-image .2s ease;
 }
 
-/* Мягкая маска справа: плавный переход без «ступеньки» */
-.rating-bar::after {
-  content: "";
-  position: absolute; inset: 0;
-  /* 1-й слой: лёгкое перо ~10px к точке заполнения
-     2-й слой: затемнение правой части после точки заполнения */
-  background:
-    linear-gradient(
-      90deg,
-      transparent 0,
-      transparent calc(var(--rating-fill, 50%) - 10px),
-      rgba(0,0,0,.40) calc(var(--rating-fill, 50%)),
-      rgba(0,0,0,.40) 100%
-    );
-  transition: background .2s ease;
-}
+/* УДАЛИ старый ::after с затемнением — он и создавал ступеньку */
+
 
 
 /* ===== Кольца вокруг аватаров ===== */
