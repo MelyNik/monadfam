@@ -25,15 +25,17 @@
      Полосы: зелёный → жёлтый → красный (очень мягко)
      Кольца: конусный градиент, шов сверху */
   --rating-gradient: linear-gradient(
-    90deg,
-    #22c55e 0%,
-    #34d399 16%,
-    #a3e635 28%,
-    #eab308 50%,
-    #f59e0b 66%,
-    #fb923c 82%,
-    #ef4444 100%
-  );
+  90deg,
+  #22c55e 0%,
+  #34d399 16%,
+  #a3e635 28%,
+  #eab308 50%,
+  #f59e0b 66%,
+  #fb923c 80%,
+  #f97316 86%,
+  #f87171 92%,
+  #ef4444 100%
+);
   --rating-conic: conic-gradient(
     from 270deg,
     #22c55e 0deg,
@@ -70,18 +72,19 @@ body {
 }
 /* нежное затемнение после уровня, НЕ маска-прозрачность */
 .rating-bar::after{
-  content:"";pointer-events:none;position:absolute;inset:0;
+  content:""; pointer-events:none; position:absolute; inset:0;
+  /* feather ≈ 26px вокруг точки заполнения */
   background:
     linear-gradient(
-      to right,
+      90deg,
       transparent 0,
-      transparent calc(var(--rating-fill,50%) - 22px),
-      rgba(12,12,18,.25) calc(var(--rating-fill,50%) - 14px),
-      rgba(12,12,18,.45) calc(var(--rating-fill,50%) - 6px),
-      rgba(12,12,18,.65) var(--rating-fill,50%),
-      rgba(12,12,18,.65) 100%
+      transparent calc(var(--rating-fill,50%) - 26px),
+      rgba(12,12,18,.20) calc(var(--rating-fill,50%) - 18px),
+      rgba(12,12,18,.40) calc(var(--rating-fill,50%) - 10px),
+      rgba(12,12,18,.60) var(--rating-fill,50%),
+      rgba(12,12,18,.60) 100%
     );
-  transition:background .15s ease;
+  transition: background .15s ease;
 }
 
 
