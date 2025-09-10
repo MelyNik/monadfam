@@ -319,54 +319,42 @@ export default function ProfilePage(){
 
                   {/* MIDDLE: кнопки голосования как на макете */}
                   <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
-                    {(tab !== 'await_ours') && (
+                    {tab !== 'await_ours' && (
                       <>
-                        {/* MIDDLE: кнопки голосования как на макете */}
-<div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
-  {(tab !== 'await_ours') && (
-    <>
-      {/* ЗА (палец вверх) */}
-      <button
-        disabled={!can}
-        title={can ? 'Vote for' : undefined}
-        onClick={() => vote(r, 'up')}
-        className={`rounded-2xl flex items-center justify-center
-          ${can ? 'bg-green-500/25 hover:bg-green-500/35' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
-        style={{ width: 82, height: 34 }}
-      >
-        {/* один и тот же кулак, для down просто поворот — внешне идентичны */}
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-          <path d="M2 10h4v12H2V10zm8 12h6a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4l.8-4.2A2 2 0 0 0 10 5l-4 7v10z"/>
-        </svg>
-      </button>
+                        {/* ЗА */}
+                        <button
+                          disabled={!can}
+                          title={can ? 'Vote for' : undefined}
+                          onClick={() => vote(r, 'up')}
+                          className={`rounded-2xl flex items-center justify-center
+                            ${can ? 'bg-green-500/25 hover:bg-green-500/35' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
+                          style={{ width: 82, height: 34 }}
+                        >
+                          <Thumb />
+                        </button>
+                        {/* ПРОТИВ (тот же знак, повернули) */}
+                        <button
+                          disabled={!can}
+                          title={can ? 'Vote against' : undefined}
+                          onClick={() => vote(r, 'down')}
+                          className={`rounded-2xl flex items-center justify-center
+                            ${can ? 'bg-red-500/25 hover:bg-red-500/35' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
+                          style={{ width: 82, height: 34 }}
+                        >
+                          <Thumb style={{ transform: 'rotate(180deg)' }} />
+                        </button>
 
-      {/* ПРОТИВ (палец вниз) — тот же знак, повернули на 180° */}
-      <button
-        disabled={!can}
-        title={can ? 'Vote against' : undefined}
-        onClick={() => vote(r, 'down')}
-        className={`rounded-2xl flex items-center justify-center
-          ${can ? 'bg-red-500/25 hover:bg-red-500/35' : 'bg-white/10 opacity-60 cursor-not-allowed'}`}
-        style={{ width: 82, height: 34 }}
-      >
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style={{ transform: 'rotate(180deg)' }}>
-          <path d="M2 10h4v12H2V10zm8 12h6a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4l.8-4.2A2 2 0 0 0 10 5l-4 7v10z"/>
-        </svg>
-      </button>
-
-      {/* знак пояснения ровно между кнопками */}
-      {!can && (
-        <div className="relative group inline-block">
-          <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
-          <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
-            {whyDisabled || 'Voting is unavailable'}
-          </div>
-        </div>
-      )}
-    </>
-  )}
-</div>
-
+                        {!can && (
+                          <div className="relative group inline-block">
+                            <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
+                            <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
+                              {whyDisabled || 'Voting is unavailable'}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
 
                   {/* RIGHT */}
                   <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>

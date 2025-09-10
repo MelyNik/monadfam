@@ -6,8 +6,8 @@ import {
 } from '../lib/state'
 
 function RatingBar({ value = 50 }: { value?: number }) {
-  const pct = `${Math.max(0, Math.min(100, value))}%`
-  return <div className="rating-bar" style={{ ['--rating-fill' as any]: `${rPct}%` }} />
+  const fill = `${Math.max(0, Math.min(100, value))}%`
+  return <div className="rating-bar" style={{ ['--rating-fill' as any]: fill }} />
 }
 
 export default function HomePage() {
