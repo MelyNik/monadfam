@@ -80,38 +80,42 @@ body {
 /* ===== Полоса рейтинга =====
    Использование: <div class="rating-bar" style="--rating-fill: 62%"></div>
    где --rating-fill — процент заполнения (0..100). */
-.rating-bar {
-  position: relative;
-  height: 0.5rem;
-  border-radius: 9999px;
-  background: #ffffff18;
-  overflow: hidden;
+/* ===== Полоса рейтинга (универсальная) =====
+   <div class="rating-bar" style="--rating-fill: 62%"></div> */
+.rating-bar{
+  position:relative;
+  height:0.5rem;
+  border-radius:9999px;
+  background:#ffffff18;
+  overflow:hidden;
 }
 
-/* градиент всегда на всю ширину */
-.rating-bar::before {
-  content: "";
-  position: absolute; inset: 0;
-  background: var(--rating-gradient);
+/* фоновая радуга — на всю длину */
+.rating-bar::before{
+  content:"";
+  position:absolute; inset:0;
+  background:var(--rating-gradient);
 }
 
-/* мягкое «перо» после точки заполнения (без жёсткой ступеньки) */
-.rating-bar::after {
-  content: "";
-  pointer-events: none;
-  position: absolute; inset: 0;
+/* мягкое «перо» после уровня: без ступеньки и без почернения */
+.rating-bar::after{
+  content:"";
+  position:absolute; inset:0; pointer-events:none;
   background:
     linear-gradient(
       90deg,
       transparent 0,
-      transparent calc(var(--rating-fill, 50%) - 26px),
-      rgba(12,12,18,.20) calc(var(--rating-fill, 50%) - 18px),
-      rgba(12,12,18,.40) calc(var(--rating-fill, 50%) - 10px),
-      rgba(12,12,18,.58) var(--rating-fill, 50%),
-      rgba(12,12,18,.58) 100%
+      transparent calc(var(--rating-fill,50%) - 42px),
+      rgba(18,18,26,.10) calc(var(--rating-fill,50%) - 24px),
+      rgba(18,18,26,.18) calc(var(--rating-fill,50%) - 12px),
+      rgba(18,18,26,.24) calc(var(--rating-fill,50%) - 6px),
+      rgba(18,18,26,.30) var(--rating-fill,50%),
+      rgba(18,18,26,.30) 100%
     );
+  filter: blur(2px);
   transition: background .15s ease;
 }
+
 
 /* ===== Кольца вокруг аватаров ===== */
 
