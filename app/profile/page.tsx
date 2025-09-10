@@ -318,44 +318,51 @@ export default function ProfilePage(){
                   </div>
 
                   {/* MIDDLE: кнопки голосования как на макете */}
+{/* MIDDLE: кнопки голосования — строго как в макете */}
 <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-  {tab !== 'await_ours' && (
-    <>
-      {/* ЗА (палец вверх) — всегда зелёный фон */}
-      <button
-        disabled={!can}
-        title={can ? 'Vote for' : undefined}
-        onClick={() => vote(r, 'up')}
-        className={`rounded-2xl flex items-center justify-center text-white/90
-          bg-green-500/25 hover:bg-green-500/35 ${!can ? 'opacity-60 cursor-not-allowed' : ''}`}
-        style={{ width: 82, height: 34 }}
-      >
-        <Thumb />
-      </button>
+  {/* ЗА */}
+  <button
+    disabled={!can}
+    title={can ? 'Vote for' : undefined}
+    onClick={() => vote(r, 'up')}
+    className={`rounded-full flex items-center justify-center text-white/90
+      bg-[#234C3C] hover:bg-[#2B5C49] ring-1 ring-[#2F6B56]/25
+      ${!can ? 'opacity-60 cursor-not-allowed' : ''}`}
+    style={{ width: 82, height: 34 }}
+  >
+    {/* один и тот же знак; вниз — просто поворот */}
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+      <path d="M2 10h4v12H2V10zm8 12h6a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4l.8-4.2A2 2 0 0 0 10 5l-4 7v10z"/>
+    </svg>
+  </button>
 
-      {/* ПРОТИВ (палец вниз) — тот же знак, повернули; всегда красный фон */}
-      <button
-        disabled={!can}
-        title={can ? 'Vote against' : undefined}
-        onClick={() => vote(r, 'down')}
-        className={`rounded-2xl flex items-center justify-center text-white/90
-          bg-red-500/25 hover:bg-red-500/35 ${!can ? 'opacity-60 cursor-not-allowed' : ''}`}
-        style={{ width: 82, height: 34 }}
-      >
-        <Thumb style={{ transform: 'rotate(180deg)' }} />
-      </button>
-
-      {/* Знак пояснения строго между кнопками (виден всегда; тултип — только когда голосовать нельзя) */}
-      <div className="relative group inline-block">
-        <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
-        {!can && (
-          <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
-            {whyDisabled || 'Voting is unavailable'}
-          </div>
-        )}
+  {/* «!» РОВНО МЕЖДУ кнопками; виден только когда голосовать нельзя */}
+  { !can ? (
+    <div className="relative group">
+      <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
+      <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
+        {whyDisabled || 'Voting is unavailable'}
       </div>
-    </>
+    </div>
+  ) : (
+    // прозрачный спейсер той же ширины, чтобы кнопки всегда стояли симметрично
+    <div className="w-6 h-6" />
   )}
+
+  {/* ПРОТИВ */}
+  <button
+    disabled={!can}
+    title={can ? 'Vote against' : undefined}
+    onClick={() => vote(r, 'down')}
+    className={`rounded-full flex items-center justify-center text-white/90
+      bg-[#3D2024] hover:bg-[#49262B] ring-1 ring-[#7F2A33]/25
+      ${!can ? 'opacity-60 cursor-not-allowed' : ''}`}
+    style={{ width: 82, height: 34 }}
+  >
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style={{ transform: 'rotate(180deg)' }}>
+      <path d="M2 10h4v12H2V10zm8 12h6a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4l.8-4.2A2 2 0 0 0 10 5l-4 7v10z"/>
+    </svg>
+  </button>
 </div>
 
 
