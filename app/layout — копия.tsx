@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import Header from './_header'
 
 export const metadata: Metadata = {
   title: 'Monad',
@@ -10,10 +9,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <Header />
-        <main>{children}</main>
-      </body>
+      <body>{children}</body>
     </html>
   )
 }
