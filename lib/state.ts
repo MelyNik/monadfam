@@ -49,24 +49,24 @@ export function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v))
 }
 
-// --- DEMO
+// --- DEMO: все голоса = 0 → старт зелёный (100%)
 const demoUsers: Row[] = [
-  { id: 101, name: 'Nik',   handle: '@user1', avatarUrl: 'https://unavatar.io/x/user1', days: 5, statusMode: 'online', votesUp: 12, votesDown: 3 },
-  { id: 102, name: 'Lena',  handle: '@user2', avatarUrl: 'https://unavatar.io/x/user2', days: 7, statusMode: 'short',  votesUp: 5,  votesDown: 1 },
-  { id: 103, name: 'Alex',  handle: '@user3', avatarUrl: 'https://unavatar.io/x/user3', days: 9, statusMode: 'long',   votesUp: 20, votesDown: 15 },
-  { id: 104, name: 'Vlad',  handle: '@user4', avatarUrl: 'https://unavatar.io/x/user4', days: 3, statusMode: 'online', votesUp: 2,  votesDown: 0 },
+  { id: 101, name: 'Nik',   handle: '@user1', avatarUrl: 'https://unavatar.io/x/user1', days: 5, statusMode: 'online', votesUp: 0, votesDown: 0 },
+  { id: 102, name: 'Lena',  handle: '@user2', avatarUrl: 'https://unavatar.io/x/user2', days: 7, statusMode: 'short',  votesUp: 0, votesDown: 0 },
+  { id: 103, name: 'Alex',  handle: '@user3', avatarUrl: 'https://unavatar.io/x/user3', days: 9, statusMode: 'long',   votesUp: 0, votesDown: 0 },
+  { id: 104, name: 'Vlad',  handle: '@user4', avatarUrl: 'https://unavatar.io/x/user4', days: 3, statusMode: 'online', votesUp: 0, votesDown: 0 },
 ]
 const seedMutual: Row[] = [
-  { id: 1, name: 'name', handle: '@alice', days: 6, avatarUrl: 'https://unavatar.io/x/alice', votesUp: 30, votesDown: 4 },
-  { id: 2, name: 'name', handle: '@bob',   days: 2, avatarUrl: 'https://unavatar.io/x/bob',   votesUp: 3,  votesDown: 0 },
+  { id: 1, name: 'name', handle: '@alice', days: 6, avatarUrl: 'https://unavatar.io/x/alice', votesUp: 0, votesDown: 0 },
+  { id: 2, name: 'name', handle: '@bob',   days: 2, avatarUrl: 'https://unavatar.io/x/bob',   votesUp: 0, votesDown: 0 },
 ]
 const seedAwaitTheir: Row[] = [
-  { id: 3, name: 'name', handle: '@carol', days: 5, avatarUrl: 'https://unavatar.io/x/carol', votesUp: 1, votesDown: 12 },
+  { id: 3, name: 'name', handle: '@carol', days: 5, avatarUrl: 'https://unavatar.io/x/carol', votesUp: 0, votesDown: 0 },
   { id: 4, name: 'name', handle: '@dave',  days: 1, avatarUrl: 'https://unavatar.io/x/dave',  votesUp: 0, votesDown: 0 },
 ]
 const seedAwaitOurs: Row[] = [
   { id: 5, name: 'name', handle: '@erin',  days: 4, avatarUrl: 'https://unavatar.io/x/erin',  votesUp: 0, votesDown: 0 },
-  { id: 6, name: 'name', handle: '@frank', days: 6, avatarUrl: 'https://unavatar.io/x/frank', votesUp: 10, votesDown: 1 },
+  { id: 6, name: 'name', handle: '@frank', days: 6, avatarUrl: 'https://unavatar.io/x/frank', votesUp: 0, votesDown: 0 },
 ]
 
 // ===== время (UTC)
@@ -121,18 +121,18 @@ function sanitizeRow(x: any): Row {
     name: String(x?.name ?? x?.username ?? 'user'),
     handle: String(x?.handle ?? x?.at ?? '@user'),
     avatarUrl: typeof x?.avatarUrl === 'string' ? x.avatarUrl : undefined,
-    days: Number.isFinite(x?.days) ? Number(x.days) : 0,
+    days: Number.isFinite(x?.days) ? Number(x?.days) : 0,
     statusMode,
-    votesUp: Number.isFinite(x?.votesUp) ? Number(x.votesUp) : 0,
-    votesDown: Number.isFinite(x?.votesDown) ? Number(x.votesDown) : 0,
+    votesUp: Number.isFinite(x?.votesUp) ? Number(x?.votesUp) : 0,
+    votesDown: Number.isFinite(x?.votesDown) ? Number(x?.votesDown) : 0,
     myVote: x?.myVote === 'up' || x?.myVote === 'down' ? x.myVote : undefined,
   }
 }
 function sanitizeLists(x: any): Lists {
   return {
-    mutual:       Array.isArray(x?.mutual)       ? x.mutual.map(sanitizeRow)       : [],
-    await_their:  Array.isArray(x?.await_their)  ? x.await_their.map(sanitizeRow)  : (Array.isArray(x?.awaitTheir) ? x.awaitTheir.map(sanitizeRow) : []),
-    await_ours:   Array.isArray(x?.await_ours)   ? x.await_ours.map(sanitizeRow)   : (Array.isArray(x?.awaitOurs)  ? x.awaitOurs.map(sanitizeRow)  : []),
+    mutual:      Array.isArray(x?.mutual)      ? x.mutual.map(sanitizeRow)      : [],
+    await_their: Array.isArray(x?.await_their) ? x.await_their.map(sanitizeRow) : (Array.isArray(x?.awaitTheir) ? x.awaitTheir.map(sanitizeRow) : []),
+    await_ours:  Array.isArray(x?.await_ours)  ? x.await_ours.map(sanitizeRow)  : (Array.isArray(x?.awaitOurs)  ? x.awaitOurs.map(sanitizeRow)  : []),
   }
 }
 function normalizeStatus(st: Status): Status {
@@ -142,12 +142,10 @@ function normalizeStatus(st: Status): Status {
     ns.shortLeft = 4
   }
   if (ns.mode === 'short' && ns.shortUntil && Date.now() >= ns.shortUntil) {
-    ns.mode = 'online'
-    ns.shortUntil = undefined
+    ns.mode = 'online'; ns.shortUntil = undefined
   }
   if (ns.longLeft <= 0 && ns.longResetAt && Date.now() >= ns.longResetAt) {
-    ns.longLeft = 1
-    ns.longResetAt = undefined
+    ns.longLeft = 1; ns.longResetAt = undefined
   }
   return ns
 }
@@ -194,49 +192,7 @@ export function resetDemoData(): AppState {
   return s
 }
 
-// ——— доступность профиля для показа на главной (онлайн)
-function isRowAvailable(r: Row) {
-  return (r.statusMode ?? 'online') === 'online'
-}
-
-// Home helpers
-export function takeNextFromPool(s: AppState): Row | null {
-  const allIds = new Set([
-    ...s.lists.mutual.map(r => r.id),
-    ...s.lists.await_their.map(r => r.id),
-    ...s.lists.await_ours.map(r => r.id),
-  ])
-  for (let i = 0; i < s.homePool.length; i++) {
-    const idx = (s.homeIndex + i) % s.homePool.length
-    const r = s.homePool[idx]
-    if (isRowAvailable(r) && !allIds.has(r.id)) {
-      s.homeIndex = idx
-      return r
-    }
-  }
-  return null
-}
-export function advancePool(s: AppState) {
-  s.homeIndex = (s.homeIndex + 1) % s.homePool.length
-}
-export function peekNextFromPool(s: AppState): Row | null {
-  const allIds = new Set([
-    ...s.lists.mutual.map(r => r.id),
-    ...s.lists.await_their.map(r => r.id),
-    ...s.lists.await_ours.map(r => r.id),
-  ])
-  for (let i = 0; i < s.homePool.length; i++) {
-    const idx = (s.homeIndex + i) % s.homePool.length
-    const r = s.homePool[idx]
-    if (isRowAvailable(r) && !allIds.has(r.id)) {
-      return r
-    }
-  }
-  return null
-}
-
-// ——— рейтинг (байес-сглаженная доля)
-// старт зелёный: при 0/0 получаем 100%
+// ——— рейтинг (байес-сглаживание) — старт 100%
 const PRIOR_UP = 20
 const PRIOR_DN = 0
 export function rating01(r: Row): number {
@@ -244,15 +200,11 @@ export function rating01(r: Row): number {
   const dn = Math.max(0, r.votesDown ?? 0)
   return (up + PRIOR_UP) / (up + dn + PRIOR_UP + PRIOR_DN)
 }
-export function ratingPercent(r: Row): number {
-  return Math.round(rating01(r) * 100)
-}
+export function ratingPercent(r: Row): number { return Math.round(rating01(r) * 100) }
 export function ratingColor(r: Row): string {
   const hue = Math.round(120 * rating01(r)) // 0..120
   return `hsl(${hue} 70% 50%)`
 }
-
-// ——— лог событий
 export function pushEvent(s: AppState, kind: string, details?: string) {
   s.events = [{ ts: Date.now(), kind, details }, ...(s.events ?? [])].slice(0, 200)
 }
