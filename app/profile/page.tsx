@@ -1,11 +1,9 @@
-// app/profile/page.tsx
 'use client'
-
 import { useEffect, useMemo, useState } from 'react'
 import {
   AppState, Row, loadState, saveState, clone,
   startOfMonthUTC, nextMonthStartFrom,
-  resetDemoData, pushEvent, ratingColor
+  resetDemoData, pushEvent, ratingPercent
 } from '../../lib/state'
 
 const MS30D = 30 * 24 * 60 * 60 * 1000
@@ -22,14 +20,11 @@ function fmtLeft(ms: number) {
 const yourAvatar = 'https://unavatar.io/x/your_handle'
 type Tab = 'mutual' | 'await_their' | 'await_ours'
 
-function isVotingDay(ts: number) {
-  const dow = new Date(ts).getDay()
-  return dow === 2 || dow === 6 // вт/сб
-}
-function canVoteOnRow(r: Row, tab: Tab, now: number, forceVotingDay: boolean) {
+function isVotingDay(ts: number) { const dow = new Date(ts).getDay(); return dow === 2 || dow === 6 }
+function canVoteOnRow(r: Row, tab: Tab, now: number) {
   if (tab === 'await_ours') return false
   if ((r.statusMode ?? 'online') !== 'online') return false
-  if (!forceVotingDay && !isVotingDay(now)) return false
+  if (!isVotingDay(now)) return false
   if ((r.days ?? 0) < 4) return false
   if (r.myVote) return false
   return true
@@ -41,40 +36,41 @@ function statusBadge(r: Row) {
   return { label: 'лонг', className: 'bg-red-600/25 text-red-300' }
 }
 
-/* универсальный «палец»; для down — rotate(180deg) */
+/* Один и тот же знак «палец», для down — поворот (визуально идентичные) */
 const Thumb = (props:any) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" {...props}>
     <path d="M2 10h4v12H2V10zm8 12h6a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4l.8-4.2A2 2 0 0 0 10 5l-4 7v10z"/>
   </svg>
 )
 
-export default function ProfilePage() {
+export default function ProfilePage(){
   const [state, setState] = useState<AppState>(() => loadState())
-  const [tab, setTab] = useState<Tab>('mutual')
-  const [q, setQ] = useState('')
+  const [tab, setTab]     = useState<Tab>('mutual')
+  const [q, setQ]         = useState('')
   const [selected, setSelected] = useState<Row | null>(null)
 
-  // тестовый режим
-  const [forceVotingDay, setForceVotingDay] = useState(false)
+  const qNorm = q.toLowerCase().replace(/^@/, '')
+  const match = (r: Row) => {
+    const h = (r.handle || '').toLowerCase().replace(/^@/, '')
+    const n = (r.name   || '').toLowerCase()
+    return h.includes(qNorm) || n.includes(qNorm)
+  }
 
   useEffect(() => {
     const t = setInterval(() => {
       setState(prev => {
         const ns = clone(prev); let changed = false; const nowTs = Date.now()
 
-        // short истёк → online
         if (ns.status.mode === 'short' && ns.status.shortUntil && nowTs >= ns.status.shortUntil) {
           ns.status.mode = 'online'; ns.status.shortUntil = undefined
           pushEvent(ns, 'status:short:end', 'Short ended → online'); changed = true
         }
-        // начало нового месяца → восстановить shortLeft
         const lastMonthStart = ns.status.shortMonthStart ?? startOfMonthUTC(nowTs)
         const nextBoundary   = nextMonthStartFrom(lastMonthStart)
         if (nowTs >= nextBoundary) {
           ns.status.shortLeft = 4; ns.status.shortMonthStart = nextBoundary
           pushEvent(ns, 'status:short:refill', 'Short attempts refilled'); changed = true
         }
-        // long cooldown
         if (ns.status.longLeft <= 0 && ns.status.longResetAt && nowTs >= ns.status.longResetAt) {
           ns.status.longLeft = 1; ns.status.longResetAt = undefined
           pushEvent(ns, 'status:long:refill', 'Long attempt restored'); changed = true
@@ -90,13 +86,6 @@ export default function ProfilePage() {
   const lists   = state.lists
   const removed = state.removed
 
-  const qNorm = q.toLowerCase().replace(/^@/, '')
-  const match = (r: Row) => {
-    const h = (r.handle || '').toLowerCase().replace(/^@/, '')
-    const n = (r.name   || '').toLowerCase()
-    return h.includes(qNorm) || n.includes(qNorm)
-  }
-
   const rows = useMemo(() => {
     const list = tab === 'mutual' ? lists.mutual : tab === 'await_their' ? lists.await_their : lists.await_ours
     return list.filter(match)
@@ -106,7 +95,6 @@ export default function ProfilePage() {
   const write = (ns: AppState) => { saveState(ns); setState(ns) }
   const ask = (msg = 'Confirm your choice?') => window.confirm(msg)
 
-  // --- операции со списками
   const unfollowFromMutual = (r: Row) => { if (!ask()) return; const ns = clone(state)
     ns.lists.mutual = ns.lists.mutual.filter(x => x.id !== r.id)
     ns.lists.await_ours = [{ ...r, days: r.days ?? 0 }, ...ns.lists.await_ours]
@@ -136,7 +124,6 @@ export default function ProfilePage() {
     ns.removed = []; pushEvent(ns, 'restore', `Restored ${removed.length} profiles`); write(ns)
   }
 
-  // --- статусы
   const toOnline = () => { const ns = clone(state)
     if (ns.status.mode === 'long') { ns.status.longActive = false; ns.status.longResetAt = Date.now() + MS30D }
     ns.status.mode = 'online'; ns.status.shortUntil = undefined
@@ -160,36 +147,45 @@ export default function ProfilePage() {
     pushEvent(ns, 'status:set', 'You switched to LONG'); write(ns)
   }
 
-  // --- голосование
   const vote = (r: Row, dir: 'up' | 'down') => {
     const ns = clone(state)
     const list = tab === 'mutual' ? ns.lists.mutual : ns.lists.await_their
     const idx = list.findIndex(x => x.id === r.id); if (idx < 0) return
-    const row = { ...list[idx] }; if (row.myVote) return; if (!canVoteOnRow(row, tab, Date.now(), forceVotingDay)) return
-
+    const row = { ...list[idx] }; if (row.myVote) return; if (!canVoteOnRow(row, tab, Date.now())) return
     if (dir === 'up')   row.votesUp   = (row.votesUp   ?? 0) + 1
     if (dir === 'down') row.votesDown = (row.votesDown ?? 0) + 1
-    row.myVote = dir
-    list[idx] = row
-
-    pushEvent(ns, 'vote', `${row.handle}: ${dir}`)
-    write(ns)
+    row.myVote = dir; list[idx] = row; pushEvent(ns, 'vote', `${row.handle}: ${dir}`); write(ns)
   }
 
-  // тестовая кнопка — сбросить голоса везде
-  const resetAllVotes = () => {
-    const ns = clone(state)
-    const wipe = (arr: Row[]) => arr.map(r => ({ ...r, votesUp: 0, votesDown: 0, myVote: undefined }))
-    ns.lists.mutual = wipe(ns.lists.mutual)
-    ns.lists.await_their = wipe(ns.lists.await_their)
-    ns.lists.await_ours = wipe(ns.lists.await_ours)
-    pushEvent(ns, 'reset', 'Reset votes in all lists')
-    write(ns)
+  const shortCountdown = useMemo(() => {
+    if (state.status.mode !== 'short' || !state.status.shortUntil) return ''
+    const left = Math.max(0, state.status.shortUntil - Date.now())
+    const sec  = Math.floor(left / 1000)
+    const h = Math.floor(sec / 3600).toString().padStart(2, '0')
+    const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0')
+    const s = Math.floor(sec % 60).toString().padStart(2, '0')
+    return `${h}:${m}:${s}`
+  }, [state.status.mode, state.status.shortUntil])
+
+  const shortRestoreIn = useMemo(() => {
+    const base = state.status.shortMonthStart ?? startOfMonthUTC(Date.now())
+    const next = nextMonthStartFrom(base)
+    return Math.max(0, next - Date.now())
+  }, [state.status.shortMonthStart])
+
+  const tabBtn = (kind: Tab, label: string, count: number) => {
+    const active = tab === kind ? 'bg-white/10' : ''
+    return (
+      <button onClick={() => setTab(kind)} className={`px-4 py-3 rounded-xl font-medium ${active}`}>
+        {label} <span className="text-white/60">({count})</span>
+      </button>
+    )
   }
 
   const selectedRow = selected ?? rows[0] ?? null
+  const doReset = () => { const s = resetDemoData(); setState(s) }
 
-  // счётчики справа
+  /* ===== счётчики Followers / Following (уникальные) ===== */
   const followersCount = useMemo(() => {
     const ids = new Set<number>()
     lists.mutual.forEach(r => ids.add(r.id))
@@ -207,7 +203,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen max-w-[1600px] mx-auto px-8 py-8 text-white">
       <button
-        onClick={() => { const s = resetDemoData(); setState(s) }}
+        onClick={doReset}
         className="fixed top-5 right-6 z-50 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15"
       >
         Reset demo data
@@ -215,7 +211,7 @@ export default function ProfilePage() {
 
       <h1 className="text-3xl font-bold mb-6 text-center">Profile</h1>
 
-      {/* statuses + restore + test menu */}
+      {/* statuses + restore */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
         <button className="px-4 py-2 rounded-xl bg-white/15" onClick={toOnline}>Online</button>
 
@@ -224,9 +220,11 @@ export default function ProfilePage() {
           className={`px-4 py-2 rounded-xl ${state.status.mode === 'short' ? 'bg-green-600/30' : 'bg-white/10'}`}
           title="Short absence: up to 2 days"
         >
-          {state.status.mode === 'short' ? 'Pause'
-            : (state.status.shortLeft > 0 ? `Short absence · ${state.status.shortLeft} left`
-                                          : 'Short absence · restores next month')}
+          {state.status.mode === 'short'
+            ? `Pause · ${shortCountdown}`
+            : (state.status.shortLeft > 0
+                ? `Short absence · ${state.status.shortLeft} left`
+                : `Short absence · restores in ${fmtLeft(shortRestoreIn)}`)}
         </button>
 
         <button
@@ -234,45 +232,37 @@ export default function ProfilePage() {
           className={`px-4 py-2 rounded-xl ${state.status.mode === 'long' ? 'bg-red-600/30' : 'bg-white/10'}`}
           title="Long absence: one per 30 days after finish"
         >
-          {state.status.mode === 'long' ? 'Stop' : (state.status.longLeft > 0 ? 'Long absence · start' : 'Long absence · cooldown')}
+          {state.status.mode === 'long'
+            ? 'Stop'
+            : (state.status.longLeft > 0
+                ? `Long absence · ${state.status.longLeft} left`
+                : `Long absence · restores in ${fmtLeft(Math.max(0, (state.status.longResetAt ?? 0) - Date.now()))}`)}
         </button>
 
         <div className="grow" />
-
-        <details className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15">
-          <summary className="cursor-pointer list-none">Test menu</summary>
-          <div className="mt-2 space-y-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={forceVotingDay}
-                onChange={e => setForceVotingDay(e.target.checked)}
-              />
-              <span>Force voting day (Tue/Sat)</span>
-            </label>
-            <button onClick={resetAllVotes} className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-sm">
-              Reset votes
-            </button>
-          </div>
-        </details>
-
-        <button onClick={restoreRemoved} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
-          Restore removed {state.removed.length ? `(${state.removed.length})` : ''}
+        <button
+          onClick={() => {
+            if (!state.removed.length) return
+            const ns = clone(state)
+            state.removed.forEach(({ from, row }) => {
+              if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
+              if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours]
+            })
+            ns.removed = []
+            saveState(ns); setState(ns)
+          }}
+          className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15"
+        >
+          Restore removed profiles {state.removed.length ? `(${state.removed.length})` : ''}
         </button>
       </div>
 
       {/* tabs + search */}
       <div className="card p-2 mb-4">
         <div className="grid md:grid-cols-3 gap-2">
-          <button onClick={() => setTab('mutual')} className={`px-4 py-3 rounded-xl font-medium ${tab === 'mutual' ? 'bg-white/10' : ''}`}>
-            Following each other <span className="text-white/60">({counts.mutual})</span>
-          </button>
-          <button onClick={() => setTab('await_their')} className={`px-4 py-3 rounded-xl font-medium ${tab === 'await_their' ? 'bg-white/10' : ''}`}>
-            Waiting for their follow-back <span className="text-white/60">({counts.await_their})</span>
-          </button>
-          <button onClick={() => setTab('await_ours')} className={`px-4 py-3 rounded-xl font-medium ${tab === 'await_ours' ? 'bg-white/10' : ''}`}>
-            Waiting for our follow <span className="text-white/60">({counts.await_ours})</span>
-          </button>
+          {tabBtn('mutual', 'Following each other', counts.mutual)}
+          {tabBtn('await_their', 'Waiting for their follow-back', counts.await_their)}
+          {tabBtn('await_ours', 'Waiting for our follow', counts.await_ours)}
         </div>
         <div className="mt-3">
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search by @handle or name" className="input w-full" />
@@ -280,12 +270,18 @@ export default function ProfilePage() {
       </div>
 
       <div className="flex gap-8 items-start">
-        {/* LEFT — наш профиль (кольцо тоже динамическое от рейтинга при желании) */}
+        {/* LEFT — наш профиль */}
         <aside className="card p-5 flex-shrink-0 w-[360px] flex flex-col items-center">
-          <div className="relative group avatar-ring-xl" style={{ background: '#22c55e' /* собственный профиль — зелёный на старте */ }}>
+          <div className="relative group avatar-ring-xl">
             <div className="avatar-ring-xl-inner">
               <img src={yourAvatar} alt="you" className="avatar-xl"/>
             </div>
+            <button
+              onClick={() => alert('Change avatar: TODO')}
+              className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/15 opacity-0 group-hover:opacity-100 transition"
+            >
+              Change avatar
+            </button>
           </div>
           <div className="mt-5 text-center">
             <div className="font-semibold text-lg">Your name</div>
@@ -302,14 +298,16 @@ export default function ProfilePage() {
           <div className="space-y-4">
             {rows.length === 0 && <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r => {
-              const can = canVoteOnRow(r, tab, Date.now(), forceVotingDay)
-              const b   = statusBadge(r)
+              const can   = canVoteOnRow(r, tab, Date.now())
+              const b     = statusBadge(r)
               const whyDisabled =
                 r.myVote ? 'You have already voted for this profile'
                 : (tab === 'await_ours' ? 'Voting is not available in this tab'
                 : ((r.statusMode ?? 'online') !== 'online' ? 'User is absent (short/long)'
-                : (!forceVotingDay && !isVotingDay(Date.now()) ? 'Voting is available only on Tuesday and Saturday'
+                : (!isVotingDay(Date.now()) ? 'Voting is available only on Tuesday and Saturday'
                 : ((r.days ?? 0) < 4 ? 'Available after 4 days in lists' : ''))))
+
+              const rPct = ratingPercent(r)
 
               return (
                 <div
@@ -320,10 +318,10 @@ export default function ProfilePage() {
                       ? 'border-red-400/30 bg-red-500/5'
                       : 'border-white/10 bg-white/5'}`}
                 >
-                  {/* LEFT: аватар с динамическим кольцом + статус под ним + имя/handle */}
+                  {/* LEFT: аватар + статус ПОД аватаром + имя/handle + мини-рейтинговая полоса */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
-                      <div className="avatar-ring-sm" style={{ background: ratingColor(r) }}>
+                      <div className="avatar-ring-sm">
                         <div className="avatar-ring-sm-inner">
                           <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
                         </div>
@@ -333,12 +331,15 @@ export default function ProfilePage() {
                     <div className="leading-5">
                       <div className="font-semibold">{r.name}</div>
                       <div className="text-white/70 text-sm">{r.handle}</div>
-                      {/* (убрано) мини-полоска рейтинга в строках */}
+                      <div className="mt-2 w-40">
+                        <div className="rating-bar" style={{ ['--rating-fill' as any]: `${rPct}%` }} />
+                      </div>
                     </div>
                   </div>
 
-                  {/* MIDDLE: кнопки голосования */}
+                  {/* MIDDLE: кнопки голосования — строго как в макете */}
                   <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                    {/* ЗА */}
                     <button
                       disabled={!can}
                       title={can ? 'Vote for' : undefined}
@@ -355,7 +356,7 @@ export default function ProfilePage() {
                     { !can ? (
                       <div className="relative group">
                         <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
-                        <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
+                        <div className="absolute z-20 hidden group-hover:block left:1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
                           {whyDisabled || 'Voting is unavailable'}
                         </div>
                       </div>
@@ -363,6 +364,7 @@ export default function ProfilePage() {
                       <div className="w-6 h-6" />
                     )}
 
+                    {/* ПРОТИВ */}
                     <button
                       disabled={!can}
                       title={can ? 'Vote against' : undefined}
@@ -376,7 +378,7 @@ export default function ProfilePage() {
                     </button>
                   </div>
 
-                  {/* RIGHT — действия */}
+                  {/* RIGHT */}
                   <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                     <a
                       className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
@@ -405,12 +407,12 @@ export default function ProfilePage() {
           </div>
         </main>
 
-        {/* RIGHT — выбранный профиль, кольцо тоже по рейтингу */}
+        {/* RIGHT — выбранный профиль */}
         <aside className="flex-shrink-0 w-[360px] space-y-4">
           <div className="card p-5 flex flex-col items-center">
             {selectedRow ? (
               <>
-                <div className="avatar-ring-xl" style={{ background: ratingColor(selectedRow) }}>
+                <div className="avatar-ring-xl">
                   <div className="avatar-ring-xl-inner">
                     <img src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'} alt={selectedRow.handle} className="avatar-xl"/>
                   </div>
