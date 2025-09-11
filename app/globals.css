@@ -20,58 +20,25 @@
   --ring-sm: 2px;
   --ring-sm-inner: 1.5px;
 
-  --rating-gradient: linear-gradient(
-    90deg,
-    #22c55e 0%,
-    #34d399 16%,
-    #a3e635 28%,
-    #eab308 50%,
-    #f59e0b 66%,
-    #fb923c 80%,
-    #f97316 86%,
-    #f87171 92%,
-    #ef4444 100%
-  );
+  /* для кнопки-полосы на главной — база зелёная */
+  --rating-green: linear-gradient(90deg, #22c55e 0%, #34d399 40%, #a3e635 100%);
 
-  --rating-conic: conic-gradient(
-    from 270deg,
-    #22c55e 0deg,
-    #34d399 90deg,
-    #eab308 180deg,
-    #fb923c 270deg,
-    #ef4444 360deg
-  );
-
+  /* запасной градиент для колец (если нет var(--ring-color)) */
+  --rating-conic: conic-gradient(from 270deg,
+    #22c55e 0deg, #34d399 100deg, #eab308 180deg, #fb923c 270deg, #ef4444 360deg);
   --ring-colors: var(--rating-conic);
 }
 
-@supports (color: oklch(0 0 0)) {
-  :root {
-    --rating-gradient: linear-gradient(
-      in oklab 90deg,
-      oklch(0.82 0.17 145) 0%,
-      oklch(0.82 0.16 120) 24%,
-      oklch(0.82 0.15 100) 38%,
-      oklch(0.80 0.15  90) 50%,
-      oklch(0.77 0.16  60) 66%,
-      oklch(0.72 0.20  40) 82%,
-      oklch(0.66 0.23  25) 92%,
-      oklch(0.62 0.24  25) 100%
-    );
-  }
-}
-
 html, body { height: 100%; }
-body {
-  color: white;
-  background: linear-gradient(135deg, var(--bg-start), var(--bg-end));
-}
+body { color: white; background: linear-gradient(135deg, var(--bg-start), var(--bg-end)); }
 
 .card  { background: var(--card); border: 1px solid var(--border); border-radius: 1.25rem; }
 .input { background: rgba(255,255,255,0.08); border: 1px solid var(--border); border-radius: 0.75rem; padding: 0.6rem 0.8rem; }
 .btn   { border-radius: 0.9rem; padding: 0.6rem 1rem; }
 
-/* ===== Полоса рейтинга ===== */
+/* ===== Полоса рейтинга на главной =====
+   <div class="rating-bar" style="--rating-fill: 100%"></div>
+   --rating-fill: 0..100 — сам рейтинг. 100% = полностью зелёная. */
 .rating-bar{
   position:relative;
   height:0.5rem;
@@ -79,34 +46,31 @@ body {
   background:#ffffff18;
   overflow:hidden;
 }
+/* база всегда зелёная */
 .rating-bar::before{
   content:"";
   position:absolute; inset:0;
-  background:var(--rating-gradient);
+  background: var(--rating-green);
 }
+/* «краснеет» справа налево, начиная с точки рейтинга */
 .rating-bar::after{
   content:"";
-  position:absolute; inset:0; pointer-events:none;
+  position:absolute; inset:0;
   background:
-    linear-gradient(
-      90deg,
+    linear-gradient(90deg,
       transparent 0,
-      transparent calc(var(--rating-fill,50%) - 42px),
-      rgba(18,18,26,.10) calc(var(--rating-fill,50%) - 24px),
-      rgba(18,18,26,.18) calc(var(--rating-fill,50%) - 12px),
-      rgba(18,18,26,.24) calc(var(--rating-fill,50%) - 6px),
-      rgba(18,18,26,.30) var(--rating-fill,50%),
-      rgba(18,18,26,.30) 100%
+      transparent var(--rating-fill, 100%),
+      #ef4444 var(--rating-fill, 100%),
+      #ef4444 100%
     );
-  filter: blur(2px);
-  transition: background .15s ease;
+  opacity:.9;
 }
 
-/* Кольца вокруг аватаров */
-.avatar-ring-xl       { background: var(--ring-colors); padding: var(--ring-xl); border-radius: 9999px; display: inline-grid; }
-.avatar-ring-xl-inner { background: #0f0f15; padding: var(--ring-xl-inner); border-radius: 9999px; }
+/* Кольца вокруг аватаров — теперь зависят от переменной --ring-color */
+.avatar-ring-xl       { background: var(--ring-color, var(--ring-colors)); padding:  var(--ring-xl);        border-radius: 9999px; display: inline-grid; }
+.avatar-ring-xl-inner { background: #0f0f15;                             padding:  var(--ring-xl-inner);  border-radius: 9999px; }
 .avatar-xl            { width: var(--avatar-xl); height: var(--avatar-xl); border-radius: 9999px; object-fit: cover; background:#1a1a1f; border:2px solid #fff; }
 
-.avatar-ring-sm       { background: var(--ring-colors); padding: var(--ring-sm); border-radius: 9999px; display: inline-grid; }
-.avatar-ring-sm-inner { background: #0f0f15; padding: var(--ring-sm-inner); border-radius: 9999px; }
+.avatar-ring-sm       { background: var(--ring-color, var(--ring-colors)); padding:  var(--ring-sm);       border-radius: 9999px; display: inline-grid; }
+.avatar-ring-sm-inner { background: #0f0f15;                             padding:  var(--ring-sm-inner);   border-radius: 9999px; }
 .avatar-sm            { width: var(--avatar-sm); height: var(--avatar-sm); border-radius: 9999px; object-fit: cover; background:#1a1a1f; border:2px solid #fff; }
