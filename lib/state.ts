@@ -49,7 +49,7 @@ export function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v))
 }
 
-// --- DEMO: все голоса = 0 → старт зелёный (100%)
+/* ---------- DEMO: все голоса = 0 (старт зелёный) ---------- */
 const demoUsers: Row[] = [
   { id: 101, name: 'Nik',   handle: '@user1', avatarUrl: 'https://unavatar.io/x/user1', days: 5, statusMode: 'online', votesUp: 0, votesDown: 0 },
   { id: 102, name: 'Lena',  handle: '@user2', avatarUrl: 'https://unavatar.io/x/user2', days: 7, statusMode: 'short',  votesUp: 0, votesDown: 0 },
@@ -69,7 +69,7 @@ const seedAwaitOurs: Row[] = [
   { id: 6, name: 'name', handle: '@frank', days: 6, avatarUrl: 'https://unavatar.io/x/frank', votesUp: 0, votesDown: 0 },
 ]
 
-// ===== время (UTC)
+/* ---------- Время (UTC) ---------- */
 export function startOfMonthUTC(ts: number) {
   const d = new Date(ts)
   const y = d.getUTCFullYear(), m = d.getUTCMonth()
@@ -112,19 +112,20 @@ export function defaultState(): AppState {
   }
 }
 
-// ---- нормализация/санитизация
+/* ---------- Нормализация/загрузка состояния ---------- */
 function sanitizeRow(x: any): Row {
   const rawStatus = x?.statusMode
-  const statusMode: StatusMode | undefined = rawStatus === 'online' || rawStatus === 'short' || rawStatus === 'long' ? rawStatus : undefined
+  const statusMode: StatusMode | undefined =
+    rawStatus === 'online' || rawStatus === 'short' || rawStatus === 'long' ? rawStatus : undefined
   return {
     id: Number(x?.id ?? Math.floor(Math.random() * 1e9)),
     name: String(x?.name ?? x?.username ?? 'user'),
     handle: String(x?.handle ?? x?.at ?? '@user'),
     avatarUrl: typeof x?.avatarUrl === 'string' ? x.avatarUrl : undefined,
-    days: Number.isFinite(x?.days) ? Number(x?.days) : 0,
+    days: Number.isFinite(x?.days) ? Number(x.days) : 0,
     statusMode,
-    votesUp: Number.isFinite(x?.votesUp) ? Number(x?.votesUp) : 0,
-    votesDown: Number.isFinite(x?.votesDown) ? Number(x?.votesDown) : 0,
+    votesUp: Number.isFinite(x?.votesUp) ? Number(x.votesUp) : 0,
+    votesDown: Number.isFinite(x?.votesDown) ? Number(x.votesDown) : 0,
     myVote: x?.myVote === 'up' || x?.myVote === 'down' ? x.myVote : undefined,
   }
 }
@@ -142,10 +143,12 @@ function normalizeStatus(st: Status): Status {
     ns.shortLeft = 4
   }
   if (ns.mode === 'short' && ns.shortUntil && Date.now() >= ns.shortUntil) {
-    ns.mode = 'online'; ns.shortUntil = undefined
+    ns.mode = 'online'
+    ns.shortUntil = undefined
   }
   if (ns.longLeft <= 0 && ns.longResetAt && Date.now() >= ns.longResetAt) {
-    ns.longLeft = 1; ns.longResetAt = undefined
+    ns.longLeft = 1
+    ns.longResetAt = undefined
   }
   return ns
 }
@@ -184,7 +187,6 @@ export function loadState(): AppState {
 }
 export function saveState(s: AppState) { localStorage.setItem(KEY, JSON.stringify(s)) }
 
-// reset demo data
 export function resetDemoData(): AppState {
   localStorage.removeItem(KEY)
   const s = defaultState()
@@ -192,7 +194,50 @@ export function resetDemoData(): AppState {
   return s
 }
 
-// ——— рейтинг (байес-сглаживание) — старт 100%
+/* ---------- Home helpers (ВОЗВРАЩЕНО) ---------- */
+function isRowAvailable(r: Row) {
+  return (r.statusMode ?? 'online') === 'online'
+}
+
+export function takeNextFromPool(s: AppState): Row | null {
+  const allIds = new Set([
+    ...s.lists.mutual.map(r => r.id),
+    ...s.lists.await_their.map(r => r.id),
+    ...s.lists.await_ours.map(r => r.id),
+  ])
+  for (let i = 0; i < s.homePool.length; i++) {
+    const idx = (s.homeIndex + i) % s.homePool.length
+    const r = s.homePool[idx]
+    if (isRowAvailable(r) && !allIds.has(r.id)) {
+      s.homeIndex = idx
+      return r
+    }
+  }
+  return null
+}
+
+export function advancePool(s: AppState) {
+  if (s.homePool.length === 0) return
+  s.homeIndex = (s.homeIndex + 1) % s.homePool.length
+}
+
+export function peekNextFromPool(s: AppState): Row | null {
+  const allIds = new Set([
+    ...s.lists.mutual.map(r => r.id),
+    ...s.lists.await_their.map(r => r.id),
+    ...s.lists.await_ours.map(r => r.id),
+  ])
+  for (let i = 0; i < s.homePool.length; i++) {
+    const idx = (s.homeIndex + i) % s.homePool.length
+    const r = s.homePool[idx]
+    if (isRowAvailable(r) && !allIds.has(r.id)) {
+      return r
+    }
+  }
+  return null
+}
+
+/* ---------- Рейтинг ---------- */
 const PRIOR_UP = 20
 const PRIOR_DN = 0
 export function rating01(r: Row): number {
@@ -200,11 +245,15 @@ export function rating01(r: Row): number {
   const dn = Math.max(0, r.votesDown ?? 0)
   return (up + PRIOR_UP) / (up + dn + PRIOR_UP + PRIOR_DN)
 }
-export function ratingPercent(r: Row): number { return Math.round(rating01(r) * 100) }
+export function ratingPercent(r: Row): number {
+  return Math.round(rating01(r) * 100)
+}
 export function ratingColor(r: Row): string {
   const hue = Math.round(120 * rating01(r)) // 0..120
   return `hsl(${hue} 70% 50%)`
 }
+
+/* ---------- Лог событий ---------- */
 export function pushEvent(s: AppState, kind: string, details?: string) {
   s.events = [{ ts: Date.now(), kind, details }, ...(s.events ?? [])].slice(0, 200)
 }
