@@ -97,7 +97,8 @@ export default function ProfilePage(){
 
   const unfollowFromMutual = (r: Row) => { if (!ask()) return; const ns = clone(state)
     ns.lists.mutual = ns.lists.mutual.filter(x => x.id !== r.id)
-    ns.lists.await_ours = [{ ...r, days: r.days ?? 0 }, ...ns.lists.await_ours]
+    // при переходе в ожидание — сбрасываем дни
+    ns.lists.await_ours = [{ ...r, days: 0 }, ...ns.lists.await_ours]
     pushEvent(ns, 'move', `${r.handle}: mutual → await_ours`); write(ns)
   }
   const unfollowFromAwaitTheir = (r: Row) => { if (!ask()) return; const ns = clone(state)
@@ -241,19 +242,10 @@ export default function ProfilePage(){
 
         <div className="grow" />
         <button
-          onClick={() => {
-            if (!state.removed.length) return
-            const ns = clone(state)
-            state.removed.forEach(({ from, row }) => {
-              if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
-              if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours]
-            })
-            ns.removed = []
-            saveState(ns); setState(ns)
-          }}
+          onClick={restoreRemoved}
           className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15"
         >
-          Restore removed profiles {state.removed.length ? `(${state.removed.length})` : ''}
+          Restore removed profiles {removed.length ? `(${removed.length})` : ''}
         </button>
       </div>
 
@@ -318,7 +310,7 @@ export default function ProfilePage(){
                       ? 'border-red-400/30 bg-red-500/5'
                       : 'border-white/10 bg-white/5'}`}
                 >
-                  {/* LEFT: аватар + статус ПОД аватаром + имя/handle + мини-рейтинговая полоса */}
+                  {/* LEFT: аватар + статус под аватаром + имя/handle + мини-рейтинговая полоса */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
                       <div className="avatar-ring-sm">
@@ -337,7 +329,7 @@ export default function ProfilePage(){
                     </div>
                   </div>
 
-                  {/* MIDDLE: кнопки голосования — строго как в макете */}
+                  {/* MIDDLE: кнопки голосования */}
                   <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                     {/* ЗА */}
                     <button
@@ -356,7 +348,7 @@ export default function ProfilePage(){
                     { !can ? (
                       <div className="relative group">
                         <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
-                        <div className="absolute z-20 hidden group-hover:block left:1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
+                        <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
                           {whyDisabled || 'Voting is unavailable'}
                         </div>
                       </div>

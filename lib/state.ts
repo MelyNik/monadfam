@@ -114,17 +114,22 @@ export function defaultState(): AppState {
 
 // ---- нормализация/санитизация
 function sanitizeRow(x: any): Row {
+  const toNum = (v: any, def = 0) => {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : def
+  }
   const rawStatus = x?.statusMode
-  const statusMode: StatusMode | undefined = rawStatus === 'online' || rawStatus === 'short' || rawStatus === 'long' ? rawStatus : undefined
+  const statusMode: StatusMode | undefined =
+    rawStatus === 'online' || rawStatus === 'short' || rawStatus === 'long' ? rawStatus : undefined
   return {
     id: Number(x?.id ?? Math.floor(Math.random() * 1e9)),
     name: String(x?.name ?? x?.username ?? 'user'),
     handle: String(x?.handle ?? x?.at ?? '@user'),
     avatarUrl: typeof x?.avatarUrl === 'string' ? x.avatarUrl : undefined,
-    days: Number.isFinite(x?.days) ? Number(x.days) : 0,
+    days: toNum(x?.days, 0),
     statusMode,
-    votesUp: Number.isFinite(x?.votesUp) ? Number(x.votesUp) : 0,
-    votesDown: Number.isFinite(x?.votesDown) ? Number(x.votesDown) : 0,
+    votesUp: toNum(x?.votesUp, 0),
+    votesDown: toNum(x?.votesDown, 0),
     myVote: x?.myVote === 'up' || x?.myVote === 'down' ? x.myVote : undefined,
   }
 }
@@ -217,6 +222,7 @@ export function takeNextFromPool(s: AppState): Row | null {
   return null
 }
 export function advancePool(s: AppState) {
+  if (s.homePool.length === 0) { s.homeIndex = 0; return }
   s.homeIndex = (s.homeIndex + 1) % s.homePool.length
 }
 export function peekNextFromPool(s: AppState): Row | null {

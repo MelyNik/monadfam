@@ -41,7 +41,8 @@ export default function HomePage() {
     if (state.status.mode !== 'online') return
     if (!candidate) return
     const s = clone(state)
-    s.lists.await_their = [{ ...candidate, days: candidate.days ?? 0 }, ...s.lists.await_their]
+    // Follow → "Waiting for our follow" (await_ours), дни с нуля
+    s.lists.await_ours = [{ ...candidate, days: 0 }, ...s.lists.await_ours]
     advancePool(s)
     saveState(s)
     setState(s)
