@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AppState, Row, loadState, saveState, clone,
   startOfMonthUTC, nextMonthStartFrom,
-  resetDemoData, pushEvent, ratingPercent
+  resetDemoData, pushEvent
 } from '../../lib/state'
 
 const MS30D = 30 * 24 * 60 * 60 * 1000
@@ -97,7 +97,6 @@ export default function ProfilePage(){
 
   const unfollowFromMutual = (r: Row) => { if (!ask()) return; const ns = clone(state)
     ns.lists.mutual = ns.lists.mutual.filter(x => x.id !== r.id)
-    // при переходе в ожидание — сбрасываем дни
     ns.lists.await_ours = [{ ...r, days: 0 }, ...ns.lists.await_ours]
     pushEvent(ns, 'move', `${r.handle}: mutual → await_ours`); write(ns)
   }
@@ -299,8 +298,6 @@ export default function ProfilePage(){
                 : (!isVotingDay(Date.now()) ? 'Voting is available only on Tuesday and Saturday'
                 : ((r.days ?? 0) < 4 ? 'Available after 4 days in lists' : ''))))
 
-              const rPct = ratingPercent(r)
-
               return (
                 <div
                   key={r.id}
@@ -310,7 +307,7 @@ export default function ProfilePage(){
                       ? 'border-red-400/30 bg-red-500/5'
                       : 'border-white/10 bg-white/5'}`}
                 >
-                  {/* LEFT: аватар + статус под аватаром + имя/handle + мини-рейтинговая полоса */}
+                  {/* LEFT: аватар + статус под аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
                       <div className="avatar-ring-sm">
@@ -323,9 +320,6 @@ export default function ProfilePage(){
                     <div className="leading-5">
                       <div className="font-semibold">{r.name}</div>
                       <div className="text-white/70 text-sm">{r.handle}</div>
-                      <div className="mt-2 w-40">
-                        <div className="rating-bar" style={{ ['--rating-fill' as any]: `${rPct}%` }} />
-                      </div>
                     </div>
                   </div>
 
