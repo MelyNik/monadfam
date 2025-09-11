@@ -1,9 +1,11 @@
+// app/profile/page.tsx
 'use client'
+
 import { useEffect, useMemo, useState } from 'react'
 import {
   AppState, Row, loadState, saveState, clone,
-  startOfMonthUTC, nextMonthStartFrom, pushEvent,
-  ratingPercent, ratingColor
+  startOfMonthUTC, nextMonthStartFrom,
+  resetDemoData, pushEvent, ratingColor
 } from '../../lib/state'
 
 const MS30D = 30 * 24 * 60 * 60 * 1000
@@ -19,17 +21,22 @@ function fmtLeft(ms: number) {
   const s = Math.floor(sec % 60).toString().padStart(2,'0')
   return d > 0 ? `${d}d ${h}h ${m}m` : `${h}:${m}:${s}`
 }
-
 function isVotingDay(ts: number) { const dow = new Date(ts).getDay(); return dow === 2 || dow === 6 }
 
-function canVoteOnRow(r: Row, tab: Tab, now: number, dev: AppState['dev']) {
+function canVoteOnRow(
+  r: Row,
+  tab: Tab,
+  now: number,
+  flags?: { forceVotingDay?: boolean; infiniteVotes?: boolean }
+) {
   if (tab === 'await_ours') return false
   if ((r.statusMode ?? 'online') !== 'online') return false
-  if (!(dev?.forceVotingDay || isVotingDay(now))) return false
+  if (!(flags?.forceVotingDay || isVotingDay(now))) return false
   if ((r.days ?? 0) < 4) return false
-  if (!dev?.infiniteVotes && r.myVote) return false
+  if (!flags?.infiniteVotes && r.myVote) return false
   return true
 }
+
 function statusBadge(r: Row) {
   const sm = r.statusMode ?? 'online'
   if (sm === 'online') return { label: 'online', className: 'bg-green-600/25 text-green-300' }
@@ -49,11 +56,15 @@ export default function ProfilePage(){
   const [q, setQ]         = useState('')
   const [selected, setSelected] = useState<Row | null>(null)
 
-  // секундный тик для таймеров
+  // тест-флаги (локальные, без изменения типов AppState)
+  const [forceVotingDay, setForceVotingDay] = useState(false)
+  const [infiniteVotes, setInfiniteVotes]   = useState(false)
+
+  // тикер для таймеров
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
 
-  // служебные автосбросы статусов
+  // авто-сбросы статусов
   useEffect(() => {
     const t = setInterval(() => {
       setState(prev => {
@@ -99,7 +110,7 @@ export default function ProfilePage(){
   const write = (ns: AppState) => { saveState(ns); setState(ns) }
   const ask = (msg = 'Confirm your choice?') => window.confirm(msg)
 
-  // === действия над списками (как раньше) ===
+  // ===== списки (как оговаривали раньше)
   const unfollowFromMutual = (r: Row) => { if (!ask()) return; const ns = clone(state)
     ns.lists.mutual = ns.lists.mutual.filter(x => x.id !== r.id)
     ns.lists.await_ours = [{ ...r, days: r.days ?? 0 }, ...ns.lists.await_ours]
@@ -126,7 +137,7 @@ export default function ProfilePage(){
     ns.removed = []; pushEvent(ns, 'restore', `Restored ${removed.length} profiles`); write(ns)
   }
 
-  // === статусы ===
+  // ===== статусы
   const toOnline = () => { const ns = clone(state)
     if (ns.status.mode === 'long') { ns.status.longActive = false; ns.status.longResetAt = Date.now() + MS30D }
     ns.status.mode = 'online'; ns.status.shortUntil = undefined
@@ -136,8 +147,9 @@ export default function ProfilePage(){
     if (ns.status.mode === 'long') { ns.status.longActive = false; ns.status.longResetAt = Date.now() + MS30D }
     if (ns.status.mode === 'short') return
     if (ns.status.shortLeft <= 0) { alert('No short absences left this month'); return }
-    const TWO_DAYS = 2 * 24 * 60 * 60 * 1000
-    ns.status.mode = 'short'; ns.status.shortLeft -= 1; ns.status.shortUntil = Date.now() + TWO_DAYS
+    ns.status.mode = 'short'
+    ns.status.shortLeft -= 1
+    ns.status.shortUntil = Date.now() + 2 * 24 * 60 * 60 * 1000
     pushEvent(ns, 'status:set', 'You switched to SHORT'); write(ns)
   }
   const toggleLong = () => { const ns = clone(state)
@@ -150,22 +162,23 @@ export default function ProfilePage(){
     pushEvent(ns, 'status:set', 'You switched to LONG'); write(ns)
   }
 
-  // === голосование ===
+  // ===== голосование (учитывает тест-флаги)
   const vote = (r: Row, dir: 'up' | 'down') => {
     const ns = clone(state)
     const list = tab === 'mutual' ? ns.lists.mutual : ns.lists.await_their
     const idx = list.findIndex(x => x.id === r.id); if (idx < 0) return
     const row = { ...list[idx] }
-    if (!canVoteOnRow(row, tab, Date.now(), ns.dev)) return
+    if (!canVoteOnRow(row, tab, Date.now(), { forceVotingDay, infiniteVotes })) return
 
     if (dir === 'up')   row.votesUp   = (row.votesUp   ?? 0) + 1
     if (dir === 'down') row.votesDown = (row.votesDown ?? 0) + 1
+    if (!infiniteVotes) row.myVote = dir  // при ∞ голосах не фиксируем «уже голосовал»
+    list[idx] = row
 
-    if (!ns.dev?.infiniteVotes) row.myVote = dir   // в тесте «∞» не фиксируем голос
-    list[idx] = row; pushEvent(ns, 'vote', `${row.handle}: ${dir}`); write(ns)
+    pushEvent(ns, 'vote', `${row.handle}: ${dir}`)
+    write(ns)
   }
 
-  // таймеры для UI
   const shortCountdown = useMemo(() => {
     if (state.status.mode !== 'short' || !state.status.shortUntil) return ''
     const left = Math.max(0, state.status.shortUntil - now)
@@ -193,7 +206,7 @@ export default function ProfilePage(){
 
   const selectedRow = selected ?? rows[0] ?? null
 
-  // счётчики Followers / Following
+  // счётчики
   const followersCount = useMemo(() => {
     const ids = new Set<number>()
     lists.mutual.forEach(r => ids.add(r.id))
@@ -209,7 +222,13 @@ export default function ProfilePage(){
 
   return (
     <div className="min-h-screen max-w-[1600px] mx-auto px-8 py-8 text-white">
-      {/* УДАЛИЛ верхнюю кнопку «Monad» — используем только левую навигацию */}
+      {/* верхнюю кнопку «Monad» удалили */}
+      <button
+        onClick={() => { const s = resetDemoData(); setState(s) }}
+        className="fixed top-5 right-6 z-50 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15"
+      >
+        Reset demo data
+      </button>
 
       <h1 className="text-3xl font-bold mb-6 text-center">Profile</h1>
 
@@ -247,23 +266,15 @@ export default function ProfilePage(){
         </button>
       </div>
 
-      {/* === ТЕСТ-МЕНЮ === */}
+      {/* ТЕСТ-МЕНЮ (локальные флаги) */}
       <div className="card p-3 mb-5">
         <div className="text-sm text-white/70 mb-2">Test mode</div>
         <label className="inline-flex items-center gap-2 mr-6">
-          <input
-            type="checkbox"
-            checked={!!state.dev?.forceVotingDay}
-            onChange={e => write({ ...state, dev: { ...state.dev, forceVotingDay: e.target.checked } })}
-          />
+          <input type="checkbox" checked={forceVotingDay} onChange={e => setForceVotingDay(e.target.checked)} />
           <span>Force Tue/Sat (voting day)</span>
         </label>
         <label className="inline-flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={!!state.dev?.infiniteVotes}
-            onChange={e => write({ ...state, dev: { ...state.dev, infiniteVotes: e.target.checked } })}
-          />
+          <input type="checkbox" checked={infiniteVotes} onChange={e => setInfiniteVotes(e.target.checked)} />
           <span>∞ votes (testing)</span>
         </label>
       </div>
@@ -283,16 +294,10 @@ export default function ProfilePage(){
       <div className="flex gap-8 items-start">
         {/* LEFT — наш профиль */}
         <aside className="card p-5 flex-shrink-0 w-[360px] flex flex-col items-center">
-          <div className="relative group avatar-ring-xl" style={{ ['--ring-color' as any]: '#22c55e' }}>
+          <div className="relative group avatar-ring-xl" style={{ background: '#22c55e' }}>
             <div className="avatar-ring-xl-inner">
               <img src={yourAvatar} alt="you" className="avatar-xl"/>
             </div>
-            <button
-              onClick={() => alert('Change avatar: TODO')}
-              className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/15 opacity-0 group-hover:opacity-100 transition"
-            >
-              Change avatar
-            </button>
           </div>
           <div className="mt-5 text-center">
             <div className="font-semibold text-lg">Your name</div>
@@ -309,18 +314,14 @@ export default function ProfilePage(){
           <div className="space-y-4">
             {rows.length === 0 && <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r => {
-              const can   = canVoteOnRow(r, tab, Date.now(), state.dev)
-              const b     = statusBadge(r)
+              const can = canVoteOnRow(r, tab, Date.now(), { forceVotingDay, infiniteVotes })
+              const b   = statusBadge(r)
               const whyDisabled =
-                (state.dev?.infiniteVotes ? '' :
-                  (r.myVote ? 'You have already voted for this profile' : '')) ||
-                (tab === 'await_ours' ? 'Voting is not available in this tab'
+                (!infiniteVotes && r.myVote ? 'You have already voted for this profile'
+                : (tab === 'await_ours' ? 'Voting is not available in this tab'
                 : ((r.statusMode ?? 'online') !== 'online' ? 'User is absent (short/long)'
-                : (!(state.dev?.forceVotingDay || isVotingDay(Date.now())) ? 'Voting is available only on Tuesday and Saturday'
-                : ((r.days ?? 0) < 4 ? 'Available after 4 days in lists' : ''))))
-
-              // стиль кольца = цвет по рейтингу
-              const ringStyle = { ['--ring-color' as any]: ratingColor(r) }
+                : (!forceVotingDay && !isVotingDay(Date.now()) ? 'Voting is available only on Tuesday and Saturday'
+                : ((r.days ?? 0) < 4 ? 'Available after 4 days in lists' : '')))))
 
               return (
                 <div
@@ -331,10 +332,10 @@ export default function ProfilePage(){
                       ? 'border-red-400/30 bg-red-500/5'
                       : 'border-white/10 bg-white/5'}`}
                 >
-                  {/* LEFT: аватар + статус + имя/handle */}
+                  {/* LEFT: аватар с кольцом-индикатором + статус + имя/handle */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
-                      <div className="avatar-ring-sm" style={ringStyle}>
+                      <div className="avatar-ring-sm" style={{ background: ratingColor(r) }}>
                         <div className="avatar-ring-sm-inner">
                           <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
                         </div>
@@ -344,7 +345,7 @@ export default function ProfilePage(){
                     <div className="leading-5">
                       <div className="font-semibold">{r.name}</div>
                       <div className="text-white/70 text-sm">{r.handle}</div>
-                      {/* УБРАНО: мини-полоса рейтинга */}
+                      {/* мини-полоска рейтинга в строках — удалена */}
                     </div>
                   </div>
 
@@ -362,11 +363,11 @@ export default function ProfilePage(){
                       <Thumb />
                     </button>
 
-                    {/* «!» только если голосовать нельзя */}
+                    {/* «!» если голосование запрещено */}
                     { !can ? (
                       <div className="relative group">
                         <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
-                        <div className="absolute z-20 hidden group-hover:block left:1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
+                        <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
                           {whyDisabled || 'Voting is unavailable'}
                         </div>
                       </div>
@@ -418,7 +419,7 @@ export default function ProfilePage(){
           <div className="card p-5 flex flex-col items-center">
             {selectedRow ? (
               <>
-                <div className="avatar-ring-xl" style={{ ['--ring-color' as any]: ratingColor(selectedRow) }}>
+                <div className="avatar-ring-xl" style={{ background: ratingColor(selectedRow) }}>
                   <div className="avatar-ring-xl-inner">
                     <img src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'} alt={selectedRow.handle} className="avatar-xl"/>
                   </div>
