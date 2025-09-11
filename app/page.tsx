@@ -5,10 +5,11 @@ import {
   peekNextFromPool, advancePool, clone, ratingPercent, resetDemoData
 } from '../lib/state'
 
-function RatingBar({ value = 100 }: { value?: number }) {
+function RatingBar({ value = 50 }: { value?: number }) {
   const clamped = Math.max(0, Math.min(100, value))
-  const style: any = { ['--rating-fill' as any]: `${clamped}%` }
-  // при 100% — полоса полностью зелёная, не ломая остальной градиент
+  const pct = `${clamped}%`
+  // при полном рейтинге — делаем градиент «зелёный→зелёный», чтобы вся полоса была зелёной
+  const style: any = { ['--rating-fill' as any]: pct }
   if (clamped >= 100) {
     style['--rating-gradient' as any] = 'linear-gradient(90deg, #22c55e 0%, #22c55e 100%)'
   }
@@ -46,7 +47,8 @@ export default function HomePage() {
     if (state.status.mode !== 'online') return
     if (!candidate) return
     const s = clone(state)
-    s.lists.await_their = [{ ...candidate, days: candidate.days ?? 0 }, ...s.lists.await_their]
+    // Follow → "Waiting for our follow" (await_ours), дни с нуля
+    s.lists.await_ours = [{ ...candidate, days: 0 }, ...s.lists.await_ours]
     advancePool(s)
     saveState(s)
     setState(s)
@@ -69,8 +71,8 @@ export default function HomePage() {
     setState(s)
   }
 
-  // стартовый кандидат — 100% (полоса зелёная)
-  const rPct = candidate ? ratingPercent(candidate) : 100
+  const rPct = candidate ? ratingPercent(candidate) : 100 // по умолчанию полный рейтинг
+<RatingBar value={rPct} />
 
   return (
     <div className="min-h-screen max-w-[1000px] mx-auto px-6 py-8 text-white">
@@ -95,7 +97,6 @@ export default function HomePage() {
             <div className="text-xl font-semibold">{candidate.name}</div>
             <div className="text-white/70 mb-4">{candidate.handle}</div>
 
-            {/* РЕЙТИНГОВАЯ ПОЛОСА */}
             <RatingBar value={rPct} />
 
             <div className="mt-6 flex justify-center gap-3">
