@@ -49,7 +49,7 @@ export default function ProfilePage(){
   const [q, setQ]         = useState('')
   const [selected, setSelected] = useState<Row | null>(null)
 
-  // обновляем "текущее время" раз в минуту, чтобы в полночь кнопки появились/исчезли
+  // чтобы в полночь кнопки голосования переключались
   const [nowTs, setNowTs] = useState(() => Date.now())
   useEffect(() => {
     const t = setInterval(() => setNowTs(Date.now()), 60_000)
@@ -384,16 +384,25 @@ export default function ProfilePage(){
                     >
                       Open in X
                     </a>
+
                     {tab === 'mutual' && (
                       <button onClick={() => unfollowFromMutual(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Unfollow</button>
                     )}
+
                     {tab === 'await_their' && (
-                      <button onClick={() => unfollowFromAwaitTheir(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Unfollow</button>
+                      <>
+                        <button onClick={() => unfollowFromAwaitTheir(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Unfollow</button>
+                        {/* ВОЗВРАЩЕНО: мягкое удаление строки с возможностью восстановления */}
+                        <button onClick={() => softRemove('await_their', r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Remove</button>
+                      </>
                     )}
+
                     {tab === 'await_ours' && (
                       <>
                         <button onClick={() => followFromAwaitOurs(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Follow</button>
                         <button onClick={() => declineFromAwaitOurs(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Decline</button>
+                        {/* ВОЗВРАЩЕНО: мягкое удаление строки с возможностью восстановления */}
+                        <button onClick={() => softRemove('await_ours', r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Remove</button>
                       </>
                     )}
                   </div>
