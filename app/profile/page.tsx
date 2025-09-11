@@ -312,6 +312,19 @@ export default function ProfilePage(){
                       ? 'border-red-400/30 bg-red-500/5'
                       : 'border-white/10 bg-white/5'}`}
                 >
+                    {/* МЯГКОЕ УДАЛЕНИЕ × — ТОЛЬКО в await_their / await_ours */}
+    {(tab === 'await_their' || tab === 'await_ours') && (
+      <button
+        onClick={(e) => { e.stopPropagation(); softRemove(tab as ('await_their' | 'await_ours'), r) }}
+        title="Remove from this tab"
+        aria-label="Remove"
+        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20
+                   text-white/80 leading-none flex items-center justify-center"
+      >
+        ×
+      </button>
+    )}
+
                   {/* LEFT: аватар + статус под аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
@@ -375,69 +388,28 @@ export default function ProfilePage(){
                   )}
 
                   {/* RIGHT */}
-                  {/* RIGHT */}
-<div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-  <a
-    className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
-    href={`https://x.com/${(r.handle || '').replace(/^@/, '')}`}
-    target="_blank"
-    rel="noopener noreferrer"
-  >
-    Open in X
-  </a>
-
-  {tab === 'mutual' && (
-    <button
-      onClick={() => unfollowFromMutual(r)}
-      className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
-    >
-      Unfollow
-    </button>
-  )}
-
-  {tab === 'await_their' && (
-    <>
-      <button
-        onClick={() => unfollowFromAwaitTheir(r)}
-        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
-      >
-        Unfollow
-      </button>
-      {/* мягкое удаление: переносит запись в state.removed */}
-      <button
-        onClick={() => softRemove('await_their', r)}
-        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
-      >
-        Remove
-      </button>
-    </>
-  )}
-
-  {tab === 'await_ours' && (
-    <>
-      <button
-        onClick={() => followFromAwaitOurs(r)}
-        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
-      >
-        Follow
-      </button>
-      <button
-        onClick={() => declineFromAwaitOurs(r)}
-        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
-      >
-        Decline
-      </button>
-      {/* мягкое удаление: переносит запись в state.removed */}
-      <button
-        onClick={() => softRemove('await_ours', r)}
-        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
-      >
-        Remove
-      </button>
-    </>
-  )}
-</div>
-
+                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                    <a
+                      className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+                      href={`https://x.com/${(r.handle || '').replace(/^@/, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open in X
+                    </a>
+                    {tab === 'mutual' && (
+                      <button onClick={() => unfollowFromMutual(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Unfollow</button>
+                    )}
+                    {tab === 'await_their' && (
+                      <button onClick={() => unfollowFromAwaitTheir(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Unfollow</button>
+                    )}
+                    {tab === 'await_ours' && (
+                      <>
+                        <button onClick={() => followFromAwaitOurs(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Follow</button>
+                        <button onClick={() => declineFromAwaitOurs(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Decline</button>
+                      </>
+                    )}
+                  </div>
                 </div>
               )
             })}
