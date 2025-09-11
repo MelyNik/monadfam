@@ -6,8 +6,14 @@ import {
 } from '../lib/state'
 
 function RatingBar({ value = 50 }: { value?: number }) {
-  const pct = `${Math.max(0, Math.min(100, value))}%`
-  return <div className="rating-bar" style={{ ['--rating-fill' as any]: pct }} />
+  const clamped = Math.max(0, Math.min(100, value))
+  const pct = `${clamped}%`
+  // при полном рейтинге — делаем градиент «зелёный→зелёный», чтобы вся полоса была зелёной
+  const style: any = { ['--rating-fill' as any]: pct }
+  if (clamped >= 100) {
+    style['--rating-gradient' as any] = 'linear-gradient(90deg, #22c55e 0%, #22c55e 100%)'
+  }
+  return <div className="rating-bar" style={style} />
 }
 
 export default function HomePage() {
@@ -65,7 +71,8 @@ export default function HomePage() {
     setState(s)
   }
 
-  const rPct = candidate ? ratingPercent(candidate) : 50
+  const rPct = candidate ? ratingPercent(candidate) : 100 // по умолчанию полный рейтинг
+<RatingBar value={rPct} />
 
   return (
     <div className="min-h-screen max-w-[1000px] mx-auto px-6 py-8 text-white">

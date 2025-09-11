@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AppState, Row, loadState, saveState, clone,
   startOfMonthUTC, nextMonthStartFrom,
-  resetDemoData, pushEvent, ratingColor
+  resetDemoData, pushEvent
 } from '../../lib/state'
 
 const MS30D = 30 * 24 * 60 * 60 * 1000
@@ -258,10 +258,7 @@ export default function ProfilePage(){
       <div className="flex gap-8 items-start">
         {/* LEFT — наш профиль */}
         <aside className="card p-5 flex-shrink-0 w-[360px] flex flex-col items-center">
-          <div
-            className="relative group avatar-ring-xl"
-            style={{ ['--ring-colors' as any]: 'hsl(120 70% 50%)' }} // по умолчанию зелёное кольцо
-          >
+          <div className="relative group avatar-ring-xl">
             <div className="avatar-ring-xl-inner">
               <img src={yourAvatar} alt="you" className="avatar-xl"/>
             </div>
@@ -308,10 +305,7 @@ export default function ProfilePage(){
                   {/* LEFT: аватар + статус под аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
-                      <div
-                        className="avatar-ring-sm"
-                        style={{ ['--ring-colors' as any]: ratingColor(r) }} // кольцо = рейтинг
-                      >
+                      <div className="avatar-ring-sm">
                         <div className="avatar-ring-sm-inner">
                           <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
                         </div>
@@ -399,10 +393,7 @@ export default function ProfilePage(){
           <div className="card p-5 flex flex-col items-center">
             {selectedRow ? (
               <>
-                <div
-                  className="avatar-ring-xl"
-                  style={{ ['--ring-colors' as any]: ratingColor(selectedRow) }} // кольцо выбранного = рейтинг
-                >
+                <div className="avatar-ring-xl">
                   <div className="avatar-ring-xl-inner">
                     <img src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'} alt={selectedRow.handle} className="avatar-xl"/>
                   </div>

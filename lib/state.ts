@@ -51,23 +51,24 @@ export function clone<T>(v: T): T {
 
 // --- DEMO
 const demoUsers: Row[] = [
-  { id: 101, name: 'Nik',   handle: '@user1', avatarUrl: 'https://unavatar.io/x/user1', days: 5, statusMode: 'online', votesUp: 12, votesDown: 3 },
-  { id: 102, name: 'Lena',  handle: '@user2', avatarUrl: 'https://unavatar.io/x/user2', days: 7, statusMode: 'short',  votesUp: 5,  votesDown: 1 },
-  { id: 103, name: 'Alex',  handle: '@user3', avatarUrl: 'https://unavatar.io/x/user3', days: 9, statusMode: 'long',   votesUp: 20, votesDown: 15 },
-  { id: 104, name: 'Vlad',  handle: '@user4', avatarUrl: 'https://unavatar.io/x/user4', days: 3, statusMode: 'online', votesUp: 2,  votesDown: 0 },
+  { id: 101, name: 'Nik',   handle: '@user1', avatarUrl: 'https://unavatar.io/x/user1', days: 5, statusMode: 'online', votesUp: 0, votesDown: 0 },
+  { id: 102, name: 'Lena',  handle: '@user2', avatarUrl: 'https://unavatar.io/x/user2', days: 7, statusMode: 'short',  votesUp: 0, votesDown: 0 },
+  { id: 103, name: 'Alex',  handle: '@user3', avatarUrl: 'https://unavatar.io/x/user3', days: 9, statusMode: 'long',   votesUp: 0, votesDown: 0 },
+  { id: 104, name: 'Vlad',  handle: '@user4', avatarUrl: 'https://unavatar.io/x/user4', days: 3, statusMode: 'online', votesUp: 0, votesDown: 0 },
 ]
 const seedMutual: Row[] = [
-  { id: 1, name: 'name', handle: '@alice', days: 6, avatarUrl: 'https://unavatar.io/x/alice', votesUp: 30, votesDown: 4 },
-  { id: 2, name: 'name', handle: '@bob',   days: 2, avatarUrl: 'https://unavatar.io/x/bob',   votesUp: 3,  votesDown: 0 },
+  { id: 1, name: 'name', handle: '@alice', days: 6, avatarUrl: 'https://unavatar.io/x/alice', votesUp: 0, votesDown: 0 },
+  { id: 2, name: 'name', handle: '@bob',   days: 2, avatarUrl: 'https://unavatar.io/x/bob',   votesUp: 0, votesDown: 0 },
 ]
 const seedAwaitTheir: Row[] = [
-  { id: 3, name: 'name', handle: '@carol', days: 5, avatarUrl: 'https://unavatar.io/x/carol', votesUp: 1, votesDown: 12 },
+  { id: 3, name: 'name', handle: '@carol', days: 5, avatarUrl: 'https://unavatar.io/x/carol', votesUp: 0, votesDown: 0 },
   { id: 4, name: 'name', handle: '@dave',  days: 1, avatarUrl: 'https://unavatar.io/x/dave',  votesUp: 0, votesDown: 0 },
 ]
 const seedAwaitOurs: Row[] = [
   { id: 5, name: 'name', handle: '@erin',  days: 4, avatarUrl: 'https://unavatar.io/x/erin',  votesUp: 0, votesDown: 0 },
-  { id: 6, name: 'name', handle: '@frank', days: 6, avatarUrl: 'https://unavatar.io/x/frank', votesUp: 10, votesDown: 1 },
+  { id: 6, name: 'name', handle: '@frank', days: 6, avatarUrl: 'https://unavatar.io/x/frank', votesUp: 0, votesDown: 0 },
 ]
+
 
 // ===== время (UTC)
 export function startOfMonthUTC(ts: number) {
