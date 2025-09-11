@@ -12,7 +12,6 @@
   --accent-hover: #9A86FF;
   --muted:    rgba(255,255,255,0.7);
 
-  /* Размеры аватаров и колец */
   --avatar-xl: 300px;
   --ring-xl: 3px;
   --ring-xl-inner: 2px;
@@ -21,9 +20,6 @@
   --ring-sm: 2px;
   --ring-sm-inner: 1.5px;
 
-  /* === Плавные градиенты рейтинга ===
-     Полосы: зелёный → жёлтый → оранжевый → красный (широкий мягкий переход)
-     Кольца: конусный градиент, шов сверху */
   --rating-gradient: linear-gradient(
     90deg,
     #22c55e 0%,
@@ -49,7 +45,6 @@
   --ring-colors: var(--rating-conic);
 }
 
-/* Progressive enhancement: ещё более гладкий переход в OKLab, если поддерживается */
 @supports (color: oklch(0 0 0)) {
   :root {
     --rating-gradient: linear-gradient(
@@ -72,16 +67,11 @@ body {
   background: linear-gradient(135deg, var(--bg-start), var(--bg-end));
 }
 
-/* карточки / инпуты / кнопки */
 .card  { background: var(--card); border: 1px solid var(--border); border-radius: 1.25rem; }
 .input { background: rgba(255,255,255,0.08); border: 1px solid var(--border); border-radius: 0.75rem; padding: 0.6rem 0.8rem; }
 .btn   { border-radius: 0.9rem; padding: 0.6rem 1rem; }
 
-/* ===== Полоса рейтинга =====
-   Использование: <div class="rating-bar" style="--rating-fill: 62%"></div>
-   где --rating-fill — процент заполнения (0..100). */
-/* ===== Полоса рейтинга (универсальная) =====
-   <div class="rating-bar" style="--rating-fill: 62%"></div> */
+/* ===== Полоса рейтинга ===== */
 .rating-bar{
   position:relative;
   height:0.5rem;
@@ -89,15 +79,11 @@ body {
   background:#ffffff18;
   overflow:hidden;
 }
-
-/* фоновая радуга — на всю длину */
 .rating-bar::before{
   content:"";
   position:absolute; inset:0;
   background:var(--rating-gradient);
 }
-
-/* мягкое «перо» после уровня: без ступеньки и без почернения */
 .rating-bar::after{
   content:"";
   position:absolute; inset:0; pointer-events:none;
@@ -116,15 +102,11 @@ body {
   transition: background .15s ease;
 }
 
-
-/* ===== Кольца вокруг аватаров ===== */
-
-/* большой аватар */
+/* Кольца вокруг аватаров */
 .avatar-ring-xl       { background: var(--ring-colors); padding: var(--ring-xl); border-radius: 9999px; display: inline-grid; }
 .avatar-ring-xl-inner { background: #0f0f15; padding: var(--ring-xl-inner); border-radius: 9999px; }
 .avatar-xl            { width: var(--avatar-xl); height: var(--avatar-xl); border-radius: 9999px; object-fit: cover; background:#1a1a1f; border:2px solid #fff; }
 
-/* маленький аватар */
 .avatar-ring-sm       { background: var(--ring-colors); padding: var(--ring-sm); border-radius: 9999px; display: inline-grid; }
 .avatar-ring-sm-inner { background: #0f0f15; padding: var(--ring-sm-inner); border-radius: 9999px; }
 .avatar-sm            { width: var(--avatar-sm); height: var(--avatar-sm); border-radius: 9999px; object-fit: cover; background:#1a1a1f; border:2px solid #fff; }

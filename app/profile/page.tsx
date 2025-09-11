@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AppState, Row, loadState, saveState, clone,
   startOfMonthUTC, nextMonthStartFrom,
-  resetDemoData, pushEvent
+  resetDemoData, pushEvent, ratingPercent
 } from '../../lib/state'
 
 const MS30D = 30 * 24 * 60 * 60 * 1000
@@ -36,7 +36,7 @@ function statusBadge(r: Row) {
   return { label: 'лонг', className: 'bg-red-600/25 text-red-300' }
 }
 
-/* Один и тот же знак «палец», для down — просто поворот (визуально идентичные) */
+/* Один и тот же знак «палец», для down — поворот (визуально идентичные) */
 const Thumb = (props:any) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" {...props}>
     <path d="M2 10h4v12H2V10zm8 12h6a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4l.8-4.2A2 2 0 0 0 10 5l-4 7v10z"/>
@@ -185,6 +185,21 @@ export default function ProfilePage(){
   const selectedRow = selected ?? rows[0] ?? null
   const doReset = () => { const s = resetDemoData(); setState(s) }
 
+  /* ===== счётчики Followers / Following (уникальные) ===== */
+  const followersCount = useMemo(() => {
+    const ids = new Set<number>()
+    lists.mutual.forEach(r => ids.add(r.id))
+    lists.await_ours.forEach(r => ids.add(r.id))
+    return ids.size
+  }, [lists.mutual, lists.await_ours])
+
+  const followingCount = useMemo(() => {
+    const ids = new Set<number>()
+    lists.mutual.forEach(r => ids.add(r.id))
+    lists.await_their.forEach(r => ids.add(r.id))
+    return ids.size
+  }, [lists.mutual, lists.await_their])
+
   return (
     <div className="min-h-screen max-w-[1600px] mx-auto px-8 py-8 text-white">
       <button
@@ -226,16 +241,7 @@ export default function ProfilePage(){
 
         <div className="grow" />
         <button
-          onClick={() => {
-            if (!state.removed.length) return
-            const ns = clone(state)
-            state.removed.forEach(({ from, row }) => {
-              if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
-              if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours]
-            })
-            ns.removed = []
-            saveState(ns); setState(ns)
-          }}
+          onClick={restoreRemoved}
           className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15"
         >
           Restore removed profiles {state.removed.length ? `(${state.removed.length})` : ''}
@@ -273,8 +279,8 @@ export default function ProfilePage(){
             <div className="text-sm text-white/70">@your_handle</div>
           </div>
           <div className="mt-6 w-full space-y-3 text-white/80">
-            <div className="flex items-center justify-between"><span>Followers</span><span>0</span></div>
-            <div className="flex items-center justify-between"><span>Following</span><span>0</span></div>
+            <div className="flex items-center justify-between"><span>Followers</span><span>{followersCount}</span></div>
+            <div className="flex items-center justify-between"><span>Following</span><span>{followingCount}</span></div>
           </div>
         </aside>
 
@@ -292,6 +298,8 @@ export default function ProfilePage(){
                 : (!isVotingDay(Date.now()) ? 'Voting is available only on Tuesday and Saturday'
                 : ((r.days ?? 0) < 4 ? 'Available after 4 days in lists' : ''))))
 
+              const rPct = ratingPercent(r)
+
               return (
                 <div
                   key={r.id}
@@ -301,7 +309,7 @@ export default function ProfilePage(){
                       ? 'border-red-400/30 bg-red-500/5'
                       : 'border-white/10 bg-white/5'}`}
                 >
-                  {/* LEFT: аватар + статус ПОД аватаром + имя/handle */}
+                  {/* LEFT: аватар + статус ПОД аватаром + имя/handle + мини-рейтинговая полоса */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
                       <div className="avatar-ring-sm">
@@ -314,57 +322,52 @@ export default function ProfilePage(){
                     <div className="leading-5">
                       <div className="font-semibold">{r.name}</div>
                       <div className="text-white/70 text-sm">{r.handle}</div>
+                      <div className="mt-2 w-40">
+                        <div className="rating-bar" style={{ ['--rating-fill' as any]: `${rPct}%` }} />
+                      </div>
                     </div>
                   </div>
 
-                  {/* MIDDLE: кнопки голосования как на макете */}
-{/* MIDDLE: кнопки голосования — строго как в макете */}
-<div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-  {/* ЗА */}
-  <button
-    disabled={!can}
-    title={can ? 'Vote for' : undefined}
-    onClick={() => vote(r, 'up')}
-    className={`rounded-full flex items-center justify-center text-white/90
-      bg-[#234C3C] hover:bg-[#2B5C49] ring-1 ring-[#2F6B56]/25
-      ${!can ? 'opacity-60 cursor-not-allowed' : ''}`}
-    style={{ width: 82, height: 34 }}
-  >
-    {/* один и тот же знак; вниз — просто поворот */}
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-      <path d="M2 10h4v12H2V10zm8 12h6a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4l.8-4.2A2 2 0 0 0 10 5l-4 7v10z"/>
-    </svg>
-  </button>
+                  {/* MIDDLE: кнопки голосования — строго как в макете */}
+                  <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                    {/* ЗА */}
+                    <button
+                      disabled={!can}
+                      title={can ? 'Vote for' : undefined}
+                      onClick={() => vote(r, 'up')}
+                      className={`rounded-full flex items-center justify-center text-white/90
+                        bg-[#234C3C] hover:bg-[#2B5C49] ring-1 ring-[#2F6B56]/25
+                        ${!can ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      style={{ width: 82, height: 34 }}
+                    >
+                      <Thumb />
+                    </button>
 
-  {/* «!» РОВНО МЕЖДУ кнопками; виден только когда голосовать нельзя */}
-  { !can ? (
-    <div className="relative group">
-      <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
-      <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
-        {whyDisabled || 'Voting is unavailable'}
-      </div>
-    </div>
-  ) : (
-    // прозрачный спейсер той же ширины, чтобы кнопки всегда стояли симметрично
-    <div className="w-6 h-6" />
-  )}
+                    {/* «!» между кнопками — только если голосование запрещено */}
+                    { !can ? (
+                      <div className="relative group">
+                        <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
+                        <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
+                          {whyDisabled || 'Voting is unavailable'}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6" />
+                    )}
 
-  {/* ПРОТИВ */}
-  <button
-    disabled={!can}
-    title={can ? 'Vote against' : undefined}
-    onClick={() => vote(r, 'down')}
-    className={`rounded-full flex items-center justify-center text-white/90
-      bg-[#3D2024] hover:bg-[#49262B] ring-1 ring-[#7F2A33]/25
-      ${!can ? 'opacity-60 cursor-not-allowed' : ''}`}
-    style={{ width: 82, height: 34 }}
-  >
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style={{ transform: 'rotate(180deg)' }}>
-      <path d="M2 10h4v12H2V10zm8 12h6a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4l.8-4.2A2 2 0 0 0 10 5l-4 7v10z"/>
-    </svg>
-  </button>
-</div>
-
+                    {/* ПРОТИВ */}
+                    <button
+                      disabled={!can}
+                      title={can ? 'Vote against' : undefined}
+                      onClick={() => vote(r, 'down')}
+                      className={`rounded-full flex items-center justify-center text-white/90
+                        bg-[#3D2024] hover:bg-[#49262B] ring-1 ring-[#7F2A33]/25
+                        ${!can ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      style={{ width: 82, height: 34 }}
+                    >
+                      <Thumb style={{ transform: 'rotate(180deg)' }} />
+                    </button>
+                  </div>
 
                   {/* RIGHT */}
                   <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
@@ -410,8 +413,8 @@ export default function ProfilePage(){
                   <div className="text-sm text-white/70">{selectedRow.handle}</div>
                 </div>
                 <div className="mt-6 w-full space-y-3 text-white/80">
-                  <div className="flex items-center justify-between"><span>Followers</span><span>0</span></div>
-                  <div className="flex items-center justify-between"><span>Following</span><span>0</span></div>
+                  <div className="flex items-center justify-between"><span>Followers</span><span>{followersCount}</span></div>
+                  <div className="flex items-center justify-between"><span>Following</span><span>{followingCount}</span></div>
                 </div>
               </>
             ) : (

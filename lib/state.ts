@@ -6,11 +6,11 @@ export type Row = {
   name: string
   handle: string
   avatarUrl?: string
-  days: number                    // сколько дней «в системе»
-  statusMode?: StatusMode         // статус ЭТОГО профиля
+  days: number
+  statusMode?: StatusMode
   votesUp?: number
   votesDown?: number
-  myVote?: 'up' | 'down'          // наш голос по этому профилю
+  myVote?: 'up' | 'down'
 }
 
 export type Lists = { mutual: Row[]; await_their: Row[]; await_ours: Row[] }
@@ -38,12 +38,11 @@ export type AppState = {
   homePool: Row[]
   homeIndex: number
   lastDaysAt?: number
-  events: EventItem[]            // лог «хлебных крошек»
+  events: EventItem[]
 }
 
 const KEY = 'monadfam:v1'
 
-// безопасный клон
 export function clone<T>(v: T): T {
   const sc: any = (globalThis as any).structuredClone
   if (typeof sc === 'function') return sc(v)
@@ -237,8 +236,9 @@ export function peekNextFromPool(s: AppState): Row | null {
 }
 
 // ——— рейтинг (байес-сглаженная доля)
+// старт зелёный: при 0/0 получаем 100%
 const PRIOR_UP = 20
-const PRIOR_DN = 5
+const PRIOR_DN = 0
 export function rating01(r: Row): number {
   const up = Math.max(0, r.votesUp ?? 0)
   const dn = Math.max(0, r.votesDown ?? 0)
