@@ -375,28 +375,69 @@ export default function ProfilePage(){
                   )}
 
                   {/* RIGHT */}
-                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                    <a
-                      className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
-                      href={`https://x.com/${(r.handle || '').replace(/^@/, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Open in X
-                    </a>
-                    {tab === 'mutual' && (
-                      <button onClick={() => unfollowFromMutual(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Unfollow</button>
-                    )}
-                    {tab === 'await_their' && (
-                      <button onClick={() => unfollowFromAwaitTheir(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Unfollow</button>
-                    )}
-                    {tab === 'await_ours' && (
-                      <>
-                        <button onClick={() => followFromAwaitOurs(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Follow</button>
-                        <button onClick={() => declineFromAwaitOurs(r)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm">Decline</button>
-                      </>
-                    )}
-                  </div>
+                  {/* RIGHT */}
+<div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+  <a
+    className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+    href={`https://x.com/${(r.handle || '').replace(/^@/, '')}`}
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    Open in X
+  </a>
+
+  {tab === 'mutual' && (
+    <button
+      onClick={() => unfollowFromMutual(r)}
+      className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+    >
+      Unfollow
+    </button>
+  )}
+
+  {tab === 'await_their' && (
+    <>
+      <button
+        onClick={() => unfollowFromAwaitTheir(r)}
+        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+      >
+        Unfollow
+      </button>
+      {/* мягкое удаление: переносит запись в state.removed */}
+      <button
+        onClick={() => softRemove('await_their', r)}
+        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+      >
+        Remove
+      </button>
+    </>
+  )}
+
+  {tab === 'await_ours' && (
+    <>
+      <button
+        onClick={() => followFromAwaitOurs(r)}
+        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+      >
+        Follow
+      </button>
+      <button
+        onClick={() => declineFromAwaitOurs(r)}
+        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+      >
+        Decline
+      </button>
+      {/* мягкое удаление: переносит запись в state.removed */}
+      <button
+        onClick={() => softRemove('await_ours', r)}
+        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+      >
+        Remove
+      </button>
+    </>
+  )}
+</div>
+
                 </div>
               )
             })}
