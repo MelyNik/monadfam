@@ -49,6 +49,14 @@ export default function ProfilePage(){
   const [q, setQ]         = useState('')
   const [selected, setSelected] = useState<Row | null>(null)
 
+  // обновляем "текущее время" раз в минуту, чтобы в полночь кнопки появились/исчезли
+  const [nowTs, setNowTs] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNowTs(Date.now()), 60_000)
+    return () => clearInterval(t)
+  }, [])
+  const voteDay = isVotingDay(nowTs)
+
   const qNorm = q.toLowerCase().replace(/^@/, '')
   const match = (r: Row) => {
     const h = (r.handle || '').toLowerCase().replace(/^@/, '')
@@ -64,15 +72,14 @@ export default function ProfilePage(){
         const text = (el.textContent || '').trim().toLowerCase()
         if (text !== 'monad') return false
         const rect = el.getBoundingClientRect()
-        const isTop = rect.top < 80            // верхняя кромка экрана (хедер)
+        const isTop = rect.top < 80
         const centerX = (rect.left + rect.right) / 2
-        const isCentered = Math.abs(centerX - window.innerWidth / 2) < 120 // по центру
+        const isCentered = Math.abs(centerX - window.innerWidth / 2) < 120
         return isTop && isCentered
       })
-      if (target) target.remove() // именно удаляем узел, не скрываем
+      if (target) target.remove()
     }
-
-    removeCenterMonad() // сразу
+    removeCenterMonad()
     const mo = new MutationObserver(removeCenterMonad)
     mo.observe(document.body, { childList: true, subtree: true })
     return () => mo.disconnect()
@@ -260,7 +267,7 @@ export default function ProfilePage(){
         <aside className="card p-5 flex-shrink-0 w-[360px] flex flex-col items-center">
           <div
             className="relative group avatar-ring-xl"
-            style={{ ['--ring-colors' as any]: 'hsl(120 70% 50%)' }} // по умолчанию зелёное кольцо
+            style={{ ['--ring-colors' as any]: 'hsl(120 70% 50%)' }}
           >
             <div className="avatar-ring-xl-inner">
               <img src={yourAvatar} alt="you" className="avatar-xl"/>
@@ -287,13 +294,13 @@ export default function ProfilePage(){
           <div className="space-y-4">
             {rows.length === 0 && <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r => {
-              const can   = canVoteOnRow(r, tab, Date.now())
+              const can   = canVoteOnRow(r, tab, nowTs)
               const b     = statusBadge(r)
               const whyDisabled =
                 r.myVote ? 'You have already voted for this profile'
                 : (tab === 'await_ours' ? 'Voting is not available in this tab'
                 : ((r.statusMode ?? 'online') !== 'online' ? 'User is absent (short/long)'
-                : (!isVotingDay(Date.now()) ? 'Voting is available only on Tuesday and Saturday'
+                : (!isVotingDay(nowTs) ? 'Voting is available only on Tuesday and Saturday'
                 : ((r.days ?? 0) < 4 ? 'Available after 4 days in lists' : ''))))
 
               return (
@@ -310,7 +317,7 @@ export default function ProfilePage(){
                     <div className="flex flex-col items-center">
                       <div
                         className="avatar-ring-sm"
-                        style={{ ['--ring-colors' as any]: ratingColor(r) }} // кольцо = рейтинг
+                        style={{ ['--ring-colors' as any]: ratingColor(r) }}
                       >
                         <div className="avatar-ring-sm-inner">
                           <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
@@ -324,46 +331,48 @@ export default function ProfilePage(){
                     </div>
                   </div>
 
-                  {/* MIDDLE: кнопки голосования */}
-                  <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                    {/* ЗА */}
-                    <button
-                      disabled={!can}
-                      title={can ? 'Vote for' : undefined}
-                      onClick={() => vote(r, 'up')}
-                      className={`rounded-full flex items-center justify-center text-white/90
-                        bg-[#234C3C] hover:bg-[#2B5C49] ring-1 ring-[#2F6B56]/25
-                        ${!can ? 'opacity-60 cursor-not-allowed' : ''}`}
-                      style={{ width: 82, height: 34 }}
-                    >
-                      <Thumb />
-                    </button>
+                  {/* MIDDLE: кнопки голосования — показываем ТОЛЬКО в день голосования */}
+                  {voteDay && (
+                    <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                      {/* ЗА */}
+                      <button
+                        disabled={!can}
+                        title={can ? 'Vote for' : undefined}
+                        onClick={() => vote(r, 'up')}
+                        className={`rounded-full flex items-center justify-center text-white/90
+                          bg-[#234C3C] hover:bg-[#2B5C49] ring-1 ring-[#2F6B56]/25
+                          ${!can ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        style={{ width: 82, height: 34 }}
+                      >
+                        <Thumb />
+                      </button>
 
-                    {/* «!» между кнопками — только если голосование запрещено */}
-                    { !can ? (
-                      <div className="relative group">
-                        <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
-                        <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
-                          {whyDisabled || 'Voting is unavailable'}
+                      {/* «!» между кнопками — только если голосование запрещено */}
+                      { !can ? (
+                        <div className="relative group">
+                          <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-xs">!</div>
+                          <div className="absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 mt-2 w-64 text-xs rounded-lg border border-white/10 bg-[rgba(10,10,16,0.96)] p-2 shadow-xl">
+                            {whyDisabled || 'Voting is unavailable'}
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="w-6 h-6" />
-                    )}
+                      ) : (
+                        <div className="w-6 h-6" />
+                      )}
 
-                    {/* ПРОТИВ */}
-                    <button
-                      disabled={!can}
-                      title={can ? 'Vote against' : undefined}
-                      onClick={() => vote(r, 'down')}
-                      className={`rounded-full flex items-center justify-center text-white/90
-                        bg-[#3D2024] hover:bg-[#49262B] ring-1 ring-[#7F2A33]/25
-                        ${!can ? 'opacity-60 cursor-not-allowed' : ''}`}
-                      style={{ width: 82, height: 34 }}
-                    >
-                      <Thumb style={{ transform: 'rotate(180deg)' }} />
-                    </button>
-                  </div>
+                      {/* ПРОТИВ */}
+                      <button
+                        disabled={!can}
+                        title={can ? 'Vote against' : undefined}
+                        onClick={() => vote(r, 'down')}
+                        className={`rounded-full flex items-center justify-center text-white/90
+                          bg-[#3D2024] hover:bg-[#49262B] ring-1 ring-[#7F2A33]/25
+                          ${!can ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        style={{ width: 82, height: 34 }}
+                      >
+                        <Thumb style={{ transform: 'rotate(180deg)' }} />
+                      </button>
+                    </div>
+                  )}
 
                   {/* RIGHT */}
                   <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
@@ -401,7 +410,7 @@ export default function ProfilePage(){
               <>
                 <div
                   className="avatar-ring-xl"
-                  style={{ ['--ring-colors' as any]: ratingColor(selectedRow) }} // кольцо выбранного = рейтинг
+                  style={{ ['--ring-colors' as any]: ratingColor(selectedRow) }}
                 >
                   <div className="avatar-ring-xl-inner">
                     <img src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'} alt={selectedRow.handle} className="avatar-xl"/>
