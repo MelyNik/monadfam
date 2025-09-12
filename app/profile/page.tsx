@@ -36,7 +36,7 @@ function statusBadge(r: Row) {
   return { label: 'лонг', className: 'bg-red-600/25 text-red-300' }
 }
 
-/* Один и тот же знак «палец», для down — поворот (визуально идентичные) */
+/* Один и тот же знак «палец», для down — поворот */
 const Thumb = (props:any) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" {...props}>
     <path d="M2 10h4v12H2V10zm8 12h6a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4l.8-4.2A2 2 0 0 0 10 5l-4 7v10z"/>
@@ -49,7 +49,14 @@ export default function ProfilePage(){
   const [q, setQ]         = useState('')
   const [selected, setSelected] = useState<Row | null>(null)
 
-  // обновляем "текущее время" раз в минуту, чтобы в полночь кнопки появились/исчезли
+  // ===== кастомный confirm (вместо window.confirm)
+  type Resolver = (v: boolean) => void
+  const [confirmBox, setConfirmBox] = useState<{open:boolean; message:string; resolve?:Resolver}>({ open:false, message:'' })
+  const ask = (msg = 'Confirm your choice?') =>
+    new Promise<boolean>((resolve) => setConfirmBox({ open: true, message: msg, resolve }))
+  const closeConfirm = (v: boolean) => { confirmBox.resolve?.(v); setConfirmBox({ open:false, message:'' }) }
+
+  // "текущее время" раз в минуту — чтобы в полночь кнопки появились/исчезли
   const [nowTs, setNowTs] = useState(() => Date.now())
   useEffect(() => {
     const t = setInterval(() => setNowTs(Date.now()), 60_000)
@@ -95,14 +102,14 @@ export default function ProfilePage(){
 
   const counts = { mutual: lists.mutual.length, await_their: lists.await_their.length, await_ours: lists.await_ours.length }
   const write = (ns: AppState) => { saveState(ns); setState(ns) }
-  const ask = (msg = 'Confirm your choice?') => window.confirm(msg)
 
-  const unfollowFromMutual = (r: Row) => { if (!ask()) return; const ns = clone(state)
+  // ===== действия с подтверждением
+  const unfollowFromMutual = async (r: Row) => { if (!(await ask())) return; const ns = clone(state)
     ns.lists.mutual = ns.lists.mutual.filter(x => x.id !== r.id)
     ns.lists.await_ours = [{ ...r, days: 0 }, ...ns.lists.await_ours]
     pushEvent(ns, 'move', `${r.handle}: mutual → await_ours`); write(ns)
   }
-  const unfollowFromAwaitTheir = (r: Row) => { if (!ask()) return; const ns = clone(state)
+  const unfollowFromAwaitTheir = async (r: Row) => { if (!(await ask())) return; const ns = clone(state)
     ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     pushEvent(ns, 'remove', `${r.handle}: removed from await_their`); write(ns)
   }
@@ -111,11 +118,11 @@ export default function ProfilePage(){
     ns.lists.mutual     = [{ ...r, days: r.days ?? 0 }, ...ns.lists.mutual]
     pushEvent(ns, 'move', `${r.handle}: await_ours → mutual`); write(ns)
   }
-  const declineFromAwaitOurs = (r: Row) => { if (!ask()) return; const ns = clone(state)
+  const declineFromAwaitOurs = async (r: Row) => { if (!(await ask())) return; const ns = clone(state)
     ns.lists.await_ours = ns.lists.await_ours.filter(x => x.id !== r.id)
     pushEvent(ns, 'remove', `${r.handle}: declined in await_ours`); write(ns)
   }
-  const softRemove = (from: 'await_their' | 'await_ours', r: Row) => { if (!ask()) return; const ns = clone(state)
+  const softRemove = async (from: 'await_their' | 'await_ours', r: Row) => { if (!(await ask())) return; const ns = clone(state)
     if (from === 'await_their') ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     if (from === 'await_ours')  ns.lists.await_ours  = ns.lists.await_ours .filter(x => x.id !== r.id)
     ns.removed = [{ from, row: r }, ...ns.removed]; pushEvent(ns, 'soft-remove', `${r.handle}: removed from ${from}`); write(ns)
@@ -312,20 +319,19 @@ export default function ProfilePage(){
                       ? 'border-red-400/30 bg-red-500/5'
                       : 'border-white/10 bg-white/5'}`}
                 >
-                    {/* МЯГКОЕ УДАЛЕНИЕ × — ТОЛЬКО в await_their / await_ours */}
-                    {(tab === 'await_their' || tab === 'await_ours') && (
-  <button
-    onClick={(e) => { e.stopPropagation(); softRemove(tab as ('await_their' | 'await_ours'), r) }}
-    title="Remove from this tab"
-    aria-label="Remove"
-    className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2
-               w-6 h-6 rounded-full bg-white/10 hover:bg-white/20
-               text-white/80 leading-none flex items-center justify-center z-10"
-  >
-    ×
-  </button>
-)}
-
+                  {/* МЯГКОЕ УДАЛЕНИЕ × — центр в правом верхнем углу карточки */}
+                  {(tab === 'await_their' || tab === 'await_ours') && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); softRemove(tab as ('await_their' | 'await_ours'), r) }}
+                      title="Remove from this tab"
+                      aria-label="Remove"
+                      className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2
+                                 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20
+                                 text-white/80 leading-none flex items-center justify-center z-10"
+                    >
+                      ×
+                    </button>
+                  )}
 
                   {/* LEFT: аватар + статус под аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
@@ -346,7 +352,7 @@ export default function ProfilePage(){
                     </div>
                   </div>
 
-                  {/* MIDDLE: кнопки голосования — показываем ТОЛЬКО в день голосования */}
+                  {/* MIDDLE: кнопки голосования — ТОЛЬКО в день голосования */}
                   {voteDay && (
                     <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                       {/* ЗА */}
@@ -446,6 +452,20 @@ export default function ProfilePage(){
           </div>
         </aside>
       </div>
+
+      {/* ===== Кастомный confirm-диалог (как туториал) ===== */}
+      {confirmBox.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="w-[92%] max-w-[520px] rounded-2xl border border-white/10 bg-[rgba(10,10,16,0.96)] p-6 shadow-2xl">
+            <h3 className="text-2xl font-bold mb-2">Confirm</h3>
+            <p className="text-white/80">{confirmBox.message || 'Confirm your choice?'}</p>
+            <div className="mt-5 flex gap-2 justify-end">
+              <button className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15" onClick={() => closeConfirm(false)}>Cancel</button>
+              <button className="px-3 py-2 rounded-xl bg-[#7C5CFF] hover:bg-[#9A86FF]" onClick={() => closeConfirm(true)}>Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
