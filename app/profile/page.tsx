@@ -313,17 +313,19 @@ export default function ProfilePage(){
                       : 'border-white/10 bg-white/5'}`}
                 >
                     {/* МЯГКОЕ УДАЛЕНИЕ × — ТОЛЬКО в await_their / await_ours */}
-    {(tab === 'await_their' || tab === 'await_ours') && (
-      <button
-        onClick={(e) => { e.stopPropagation(); softRemove(tab as ('await_their' | 'await_ours'), r) }}
-        title="Remove from this tab"
-        aria-label="Remove"
-        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20
-                   text-white/80 leading-none flex items-center justify-center"
-      >
-        ×
-      </button>
-    )}
+                    {(tab === 'await_their' || tab === 'await_ours') && (
+  <button
+    onClick={(e) => { e.stopPropagation(); softRemove(tab as ('await_their' | 'await_ours'), r) }}
+    title="Remove from this tab"
+    aria-label="Remove"
+    className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2
+               w-6 h-6 rounded-full bg-white/10 hover:bg-white/20
+               text-white/80 leading-none flex items-center justify-center z-10"
+  >
+    ×
+  </button>
+)}
+
 
                   {/* LEFT: аватар + статус под аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
