@@ -140,11 +140,18 @@ export default function ProfilePage(){
     if (from === 'await_ours')  ns.lists.await_ours  = ns.lists.await_ours .filter(x => x.id !== r.id)
     ns.removed = [{ from, row: r }, ...ns.removed]; pushEvent(ns, 'soft-remove', `${r.handle}: removed from ${from}`); write(ns)
   }
-  const restoreRemoved = () => { if (!removed.length) return; const ns = clone(state)
-    removed.forEach(({ from, row }) => { if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
-                                         if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours] })
-    ns.removed = []; pushEvent(ns, 'restore', `Restored ${removed length} profiles`); write(ns)
-  }
+  const restoreRemoved = () => {
+  if (!removed.length) return
+  const ns = clone(state)
+  removed.forEach(({ from, row }) => {
+    if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
+    if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours]
+  })
+  ns.removed = []
+  pushEvent(ns, 'restore', `Restored ${removed.length} profiles`)
+  write(ns)
+}
+
 
   const toOnline = () => { const ns = clone(state)
     if (ns.status.mode === 'long') { ns.status.longActive = false; ns.status.longResetAt = Date.now() + MS30D }
