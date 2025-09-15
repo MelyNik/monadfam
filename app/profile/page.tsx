@@ -8,7 +8,6 @@ import {
 
 import AvatarRing from './AvatarRing'
 
-
 const MS30D = 30 * 24 * 60 * 60 * 1000
 
 function fmtLeft(ms: number) {
@@ -52,6 +51,11 @@ export default function ProfilePage(){
   const [q, setQ]         = useState('')
   const [selected, setSelected] = useState<Row | null>(null)
 
+  // ===== DEV FLAGS (только для теста рейтинга/голосования; не меняют геометрию)
+  const [devForceVotingDay, setDevForceVotingDay]   = useState(false)
+  const [devUnlimitedVoting, setDevUnlimitedVoting] = useState(false)
+  const [devSelId, setDevSelId]                     = useState<number | null>(null)
+
   // ===== кастомный confirm (вместо window.confirm)
   type Resolver = (v: boolean) => void
   const [confirmBox, setConfirmBox] = useState<{open:boolean; message:string; resolve?:Resolver}>({ open:false, message:'' })
@@ -65,7 +69,8 @@ export default function ProfilePage(){
     const t = setInterval(() => setNowTs(Date.now()), 60_000)
     return () => clearInterval(t)
   }, [])
-  const voteDay = isVotingDay(nowTs)
+  // Форс-день голосования включается dev-меню
+  const voteDay = devForceVotingDay || isVotingDay(nowTs)
 
   const qNorm = q.toLowerCase().replace(/^@/, '')
   const match = (r: Row) => {
@@ -103,6 +108,11 @@ export default function ProfilePage(){
     return list.filter(match)
   }, [tab, lists, q])
 
+  // дефолт выбираем первого в текущем списке для dev-меню
+  useEffect(() => {
+    if (devSelId == null && rows.length) setDevSelId(rows[0].id)
+  }, [rows, devSelId])
+
   const counts = { mutual: lists.mutual.length, await_their: lists.await_their.length, await_ours: lists.await_ours.length }
   const write = (ns: AppState) => { saveState(ns); setState(ns) }
 
@@ -133,7 +143,7 @@ export default function ProfilePage(){
   const restoreRemoved = () => { if (!removed.length) return; const ns = clone(state)
     removed.forEach(({ from, row }) => { if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
                                          if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours] })
-    ns.removed = []; pushEvent(ns, 'restore', `Restored ${removed.length} profiles`); write(ns)
+    ns.removed = []; pushEvent(ns, 'restore', `Restored ${removed length} profiles`); write(ns)
   }
 
   const toOnline = () => { const ns = clone(state)
@@ -159,14 +169,33 @@ export default function ProfilePage(){
     pushEvent(ns, 'status:set', 'You switched to LONG'); write(ns)
   }
 
+  // Голосование: учитываем dev-флаги (безлимит и форс-день)
   const vote = (r: Row, dir: 'up' | 'down') => {
     const ns = clone(state)
     const list = tab === 'mutual' ? ns.lists.mutual : ns.lists.await_their
     const idx = list.findIndex(x => x.id === r.id); if (idx < 0) return
-    const row = { ...list[idx] }; if (row.myVote) return; if (!canVoteOnRow(row, tab, Date.now())) return
+    const row = { ...list[idx] }
+
+    const baseAllowed = canVoteOnRow(row, tab, Date.now())
+    const dayBypassAllowed =
+      (tab !== 'await_ours') &&
+      ((row.statusMode ?? 'online') === 'online') &&
+      ((row.days ?? 0) >= 4) &&
+      !row.myVote
+
+    const canDev = devUnlimitedVoting
+      ? true
+      : (baseAllowed || (devForceVotingDay && dayBypassAllowed))
+
+    if (!canDev) return
+
     if (dir === 'up')   row.votesUp   = (row.votesUp   ?? 0) + 1
     if (dir === 'down') row.votesDown = (row.votesDown ?? 0) + 1
-    row.myVote = dir; list[idx] = row; pushEvent(ns, 'vote', `${row.handle}: ${dir}`); write(ns)
+    if (!devUnlimitedVoting) row.myVote = dir
+
+    list[idx] = row
+    pushEvent(ns, 'vote', `${row.handle}: ${dir}`)
+    write(ns)
   }
 
   const shortCountdown = useMemo(() => {
@@ -222,6 +251,39 @@ export default function ProfilePage(){
       </button>
 
       <h1 className="text-3xl font-bold mb-6 text-center">Profile</h1>
+
+      {/* ===== DEV MENU (добавлено; остальная геометрия не менялась) ===== */}
+      <div className="card p-3 mb-4">
+        <div className="text-xs uppercase tracking-wider text-white/60">Dev menu</div>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={devForceVotingDay} onChange={e=>setDevForceVotingDay(e.target.checked)} />
+            <span>День голосования (форс)</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={devUnlimitedVoting} onChange={e=>setDevUnlimitedVoting(e.target.checked)} />
+            <span>Безлимит голосования</span>
+          </label>
+          <select
+            className="rounded-md border border-white/15 bg-transparent px-2 py-1"
+            value={devSelId ?? ''} onChange={e=>setDevSelId(Number(e.target.value)||null)}
+          >
+            {rows.map(r => (
+              <option key={r.id} value={r.id}>{r.name || r.handle || `#${r.id}`}</option>
+            ))}
+          </select>
+          <button
+            className="h-8 px-3 rounded-lg bg-emerald-600 text-white text-sm disabled:opacity-50"
+            disabled={!devSelId}
+            onClick={() => { const r = rows.find(x=>x.id===devSelId); if (r) vote(r,'up') }}
+          >+1 выбранному</button>
+          <button
+            className="h-8 px-3 rounded-lg bg-red-600 text-white text-sm disabled:opacity-50"
+            disabled={!devSelId}
+            onClick={() => { const r = rows.find(x=>x.id===devSelId); if (r) vote(r,'down') }}
+          >−1 выбранному</button>
+        </div>
+      </div>
 
       {/* statuses + restore */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -304,13 +366,22 @@ export default function ProfilePage(){
           <div className="space-y-4">
             {rows.length === 0 && <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r => {
-              const can   = canVoteOnRow(r, tab, nowTs)
+              // Базовая проверка + dev-блокировки
+              const baseCan = canVoteOnRow(r, tab, nowTs)
+              const dayBypassAllowed =
+                (tab !== 'await_ours') &&
+                ((r.statusMode ?? 'online') === 'online') &&
+                ((r.days ?? 0) >= 4) &&
+                !r.myVote
+              const can   = devUnlimitedVoting ? true : (baseCan || (devForceVotingDay && dayBypassAllowed))
+
               const b     = statusBadge(r)
               const whyDisabled =
+                devUnlimitedVoting ? '' :
                 r.myVote ? 'You have already voted for this profile'
                 : (tab === 'await_ours' ? 'Voting is not available in this tab'
                 : ((r.statusMode ?? 'online') !== 'online' ? 'User is absent (short/long)'
-                : (!isVotingDay(nowTs) ? 'Voting is available only on Tuesday and Saturday'
+                : (!voteDay ? 'Voting is available only on Tuesday and Saturday'
                 : ((r.days ?? 0) < 4 ? 'Available after 4 days in lists' : ''))))
 
               return (
@@ -355,7 +426,7 @@ export default function ProfilePage(){
                     </div>
                   </div>
 
-                  {/* MIDDLE: кнопки голосования — ТОЛЬКО в день голосования */}
+                  {/* MIDDLE: кнопки голосования — ТОЛЬКО в день голосования (или форс) */}
                   {voteDay && (
                     <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                       {/* ЗА */}
