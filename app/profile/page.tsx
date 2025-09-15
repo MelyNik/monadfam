@@ -3,10 +3,11 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AppState, Row, loadState, saveState, clone,
   startOfMonthUTC, nextMonthStartFrom,
-  resetDemoData, pushEvent
+  resetDemoData, pushEvent, ratingColor
 } from '../../lib/state'
 
 import AvatarRing from './AvatarRing'
+
 
 const MS30D = 30 * 24 * 60 * 60 * 1000
 
@@ -23,7 +24,14 @@ const yourAvatar = 'https://unavatar.io/x/your_handle'
 type Tab = 'mutual' | 'await_their' | 'await_ours'
 
 function isVotingDay(ts: number) { const dow = new Date(ts).getDay(); return dow === 2 || dow === 6 }
-
+function canVoteOnRow(r: Row, tab: Tab, now: number) {
+  if (tab === 'await_ours') return false
+  if ((r.statusMode ?? 'online') !== 'online') return false
+  if (!isVotingDay(now)) return false
+  if ((r.days ?? 0) < 4) return false
+  if (r.myVote) return false
+  return true
+}
 function statusBadge(r: Row) {
   const sm = r.statusMode ?? 'online'
   if (sm === 'online') return { label: 'online', className: 'bg-green-600/25 text-green-300' }
@@ -44,13 +52,6 @@ export default function ProfilePage(){
   const [q, setQ]         = useState('')
   const [selected, setSelected] = useState<Row | null>(null)
 
-  // ===== DEV: локальные настройки теста голосования (всё только тут, без правок lib/)
-  const [devForceVotingDay, setDevForceVotingDay]   = useState(false)
-  const [devUnlimitedVoting, setDevUnlimitedVoting] = useState(false)
-  const [devCap, setDevCap]                         = useState(20) // сколько "минусов" до полного красного
-  const [devCounters, setDevCounters]               = useState<Record<number, {neg:number; pos:number}>>({})
-  const [devSelId, setDevSelId]                     = useState<number | null>(null)
-
   // ===== кастомный confirm (вместо window.confirm)
   type Resolver = (v: boolean) => void
   const [confirmBox, setConfirmBox] = useState<{open:boolean; message:string; resolve?:Resolver}>({ open:false, message:'' })
@@ -64,9 +65,7 @@ export default function ProfilePage(){
     const t = setInterval(() => setNowTs(Date.now()), 60_000)
     return () => clearInterval(t)
   }, [])
-
-  // Если флаг включён — считаем, что сейчас "день голосования"
-  const voteDay = devForceVotingDay || isVotingDay(nowTs)
+  const voteDay = isVotingDay(nowTs)
 
   const qNorm = q.toLowerCase().replace(/^@/, '')
   const match = (r: Row) => {
@@ -103,11 +102,6 @@ export default function ProfilePage(){
     const list = tab === 'mutual' ? lists.mutual : tab === 'await_their' ? lists.await_their : lists.await_ours
     return list.filter(match)
   }, [tab, lists, q])
-
-  // дефолт выбора юзера в dev-меню
-  useEffect(() => {
-    if (!devSelId && rows.length) setDevSelId(rows[0].id)
-  }, [rows, devSelId])
 
   const counts = { mutual: lists.mutual.length, await_their: lists.await_their.length, await_ours: lists.await_ours.length }
   const write = (ns: AppState) => { saveState(ns); setState(ns) }
@@ -165,37 +159,14 @@ export default function ProfilePage(){
     pushEvent(ns, 'status:set', 'You switched to LONG'); write(ns)
   }
 
-  // DEV-aware доступность голосования
-  const canVoteOnRowDev = (r: Row): boolean => {
-    if (devUnlimitedVoting) return true
-    if (tab === 'await_ours') return false
-    if ((r.statusMode ?? 'online') !== 'online') return false
-    if (!devForceVotingDay && !isVotingDay(Date.now())) return false
-    if ((r.days ?? 0) < 4) return false
-    if (r.myVote) return false
-    return true
-  }
-
-  // Голосование + накрутка devCounters (для визуального «покраснения»)
   const vote = (r: Row, dir: 'up' | 'down') => {
     const ns = clone(state)
     const list = tab === 'mutual' ? ns.lists.mutual : ns.lists.await_their
     const idx = list.findIndex(x => x.id === r.id); if (idx < 0) return
-    const row = { ...list[idx] }
-
-    if (!devUnlimitedVoting && row.myVote) return
-    if (!canVoteOnRowDev(row)) return
-
+    const row = { ...list[idx] }; if (row.myVote) return; if (!canVoteOnRow(row, tab, Date.now())) return
     if (dir === 'up')   row.votesUp   = (row.votesUp   ?? 0) + 1
     if (dir === 'down') row.votesDown = (row.votesDown ?? 0) + 1
-    if (!devUnlimitedVoting) row.myVote = dir
-
-    list[idx] = row; pushEvent(ns, 'vote', `${row.handle}: ${dir}`); write(ns)
-
-    setDevCounters(prev => {
-      const cur = prev[r.id] || { neg:0, pos:0 }
-      return { ...prev, [r.id]: { neg: cur.neg + (dir==='down'?1:0), pos: cur.pos + (dir==='up'?1:0) } }
-    })
+    row.myVote = dir; list[idx] = row; pushEvent(ns, 'vote', `${row.handle}: ${dir}`); write(ns)
   }
 
   const shortCountdown = useMemo(() => {
@@ -241,16 +212,6 @@ export default function ProfilePage(){
     return ids.size
   }, [lists.mutual, lists.await_their])
 
-  // helpers для dev-контролов
-  const devInc = (dir:'up'|'down') => {
-    if (!devSelId) return
-    setDevCounters(prev => {
-      const cur = prev[devSelId!] || { neg:0, pos:0 }
-      return { ...prev, [devSelId!]: { neg: cur.neg + (dir==='down'?1:0), pos: cur.pos + (dir==='up'?1:0) } }
-    })
-  }
-  const devSelRow = rows.find(r => r.id === devSelId) || null
-
   return (
     <div className="min-h-screen max-w-[1600px] mx-auto px-8 py-8 text-white">
       <button
@@ -261,46 +222,6 @@ export default function ProfilePage(){
       </button>
 
       <h1 className="text-3xl font-bold mb-6 text-center">Profile</h1>
-
-      {/* ===== DEV MENU (всё в этом файле, легко убрать) ===== */}
-      <div className="mb-4 rounded-2xl border border-white/10 bg-white/5 p-3">
-        <div className="text-xs uppercase tracking-wider text-white/60">Dev menu</div>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={devForceVotingDay} onChange={e=>setDevForceVotingDay(e.target.checked)} />
-            <span>День голосования сейчас</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={devUnlimitedVoting} onChange={e=>setDevUnlimitedVoting(e.target.checked)} />
-            <span>Безлимитное голосование</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <span>Порог до полного красного</span>
-            <input
-              type="number" min={1} className="w-20 rounded-md border border-white/15 bg-transparent px-2 py-1"
-              value={devCap} onChange={e=>setDevCap(Math.max(1, Math.floor(Number(e.target.value)||1)))}
-            />
-          </label>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <select
-            className="rounded-md border border-white/15 bg-transparent px-2 py-1"
-            value={devSelId ?? ''} onChange={e=>setDevSelId(Number(e.target.value)||null)}
-          >
-            {rows.map(r => (
-              <option key={r.id} value={r.id}>{r.name || r.handle || `#${r.id}`}</option>
-            ))}
-          </select>
-          <button onClick={()=>devInc('up')} className="h-8 px-3 rounded-lg bg-emerald-600 text-white text-sm disabled:opacity-50" disabled={!devSelId}>+1 выбранному</button>
-          <button onClick={()=>devInc('down')} className="h-8 px-3 rounded-lg bg-red-600 text-white text-sm disabled:opacity-50" disabled={!devSelId}>−1 выбранному</button>
-          {devSelRow && (
-            <span className="text-xs text-white/70 ml-2">
-              now: +{devCounters[devSelRow.id]?.pos ?? 0} / −{devCounters[devSelRow.id]?.neg ?? 0}
-            </span>
-          )}
-        </div>
-      </div>
 
       {/* statuses + restore */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -354,15 +275,13 @@ export default function ProfilePage(){
       <div className="flex gap-8 items-start">
         {/* LEFT — наш профиль */}
         <aside className="card p-5 flex-shrink-0 w-[360px] flex flex-col items-center">
-          <div className="relative group">
-            <div className="">{/* пульс не нужен для своего профиля */}</div>
-            <AvatarRing
-              src={yourAvatar}
-              rating={(state as any).you?.rating}
-              negProgress={0}
-              size={96}
-              thickness={4}
-            />
+          <div
+            className="relative group avatar-ring-xl"
+            style={{ ['--ring-colors' as any]: 'hsl(120 70% 50%)' }}
+          >
+            <div className="avatar-ring-xl-inner">
+              <img src={yourAvatar} alt="you" className="avatar-xl"/>
+            </div>
             <button
               onClick={() => alert('Change avatar: TODO')}
               className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/15 opacity-0 group-hover:opacity-100 transition"
@@ -385,21 +304,13 @@ export default function ProfilePage(){
           <div className="space-y-4">
             {rows.length === 0 && <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r => {
-              const can   = canVoteOnRowDev(r)
+              const can   = canVoteOnRow(r, tab, nowTs)
               const b     = statusBadge(r)
-
-              // двойная привязка: dev и реальные голоса
-              const devProg  = Math.min(1, (devCounters[r.id]?.neg ?? 0) / Math.max(1, devCap))
-              const up = r.votesUp ?? 0, down = r.votesDown ?? 0
-              const realProg = (up + down) ? (down / (up + down)) : 0
-              const negProg  = Math.min(1, Math.max(devProg, realProg))
-
               const whyDisabled =
-                devUnlimitedVoting ? '' :
                 r.myVote ? 'You have already voted for this profile'
                 : (tab === 'await_ours' ? 'Voting is not available in this tab'
                 : ((r.statusMode ?? 'online') !== 'online' ? 'User is absent (short/long)'
-                : (!devForceVotingDay && !isVotingDay(nowTs) ? 'Voting is available only on Tuesday and Saturday'
+                : (!isVotingDay(nowTs) ? 'Voting is available only on Tuesday and Saturday'
                 : ((r.days ?? 0) < 4 ? 'Available after 4 days in lists' : ''))))
 
               return (
@@ -428,14 +339,13 @@ export default function ProfilePage(){
                   {/* LEFT: аватар + статус под аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
-                      <div className={negProg > 0.66 ? 'danger-pulse' : undefined}>
-                        <AvatarRing
-                          src={r.avatarUrl || 'https://unavatar.io/x/twitter'}
-                          rating={(r as any).rating}
-                          negProgress={negProg}
-                          size={48}
-                          thickness={3}
-                        />
+                      <div
+                        className="avatar-ring-sm"
+                        style={{ ['--ring-colors' as any]: ratingColor(r) }}
+                      >
+                        <div className="avatar-ring-sm-inner">
+                          <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
+                        </div>
                       </div>
                       <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full ${b.className}`}>{b.label}</div>
                     </div>
@@ -445,7 +355,7 @@ export default function ProfilePage(){
                     </div>
                   </div>
 
-                  {/* MIDDLE: кнопки голосования — показываем, если реальный или принудительный день голосования */}
+                  {/* MIDDLE: кнопки голосования — ТОЛЬКО в день голосования */}
                   {voteDay && (
                     <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                       {/* ЗА */}
@@ -522,23 +432,14 @@ export default function ProfilePage(){
           <div className="card p-5 flex flex-col items-center">
             {selectedRow ? (
               <>
-                {(() => {
-                  const devProg  = Math.min(1, (devCounters[selectedRow.id]?.neg ?? 0) / Math.max(1, devCap))
-                  const up = selectedRow.votesUp ?? 0, down = selectedRow.votesDown ?? 0
-                  const realProg = (up + down) ? (down / (up + down)) : 0
-                  const negProg  = Math.min(1, Math.max(devProg, realProg))
-                  return (
-                    <div className={negProg > 0.66 ? 'danger-pulse' : undefined}>
-                      <AvatarRing
-                        src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'}
-                        rating={(selectedRow as any).rating}
-                        negProgress={negProg}
-                        size={120}
-                        thickness={5}
-                      />
-                    </div>
-                  )
-                })()}
+                <div
+                  className="avatar-ring-xl"
+                  style={{ ['--ring-colors' as any]: ratingColor(selectedRow) }}
+                >
+                  <div className="avatar-ring-xl-inner">
+                    <img src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'} alt={selectedRow.handle} className="avatar-xl"/>
+                  </div>
+                </div>
                 <div className="mt-5 text-center">
                   <div className="font-semibold text-lg">{selectedRow.name}</div>
                   <div className="text-sm text-white/70">{selectedRow.handle}</div>
@@ -568,20 +469,6 @@ export default function ProfilePage(){
           </div>
         </div>
       )}
-
-      {/* Локальный стиль для мягкого мерцания (порог > 0.66) */}
-      <style jsx>{`
-        @keyframes dangerPulse {
-          0%   { box-shadow: 0 0 0 0 rgba(220, 38, 38, .35); }
-          70%  { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
-        }
-        .danger-pulse {
-          animation: dangerPulse 2s ease-in-out infinite;
-          border-radius: 9999px;
-          display: inline-block;
-        }
-      `}</style>
     </div>
   )
 }

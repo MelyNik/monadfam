@@ -4,91 +4,76 @@ import React, { useId } from 'react'
 type Props = {
   src: string
   alt?: string
-  size?: number        // общий диаметр, px
+  size?: number        // диаметр, px
   thickness?: number   // толщина кольца, px
-  rating?: number      // зарезервировано (на будущее)
-  negProgress?: number // 0..1 — сколько «покраснело» по дуге
+  negProgress?: number // 0..1 — насколько «покраснело» по дуге
   className?: string
 }
 
 /**
- * Базовое кольцо показывает ваш конусный градиент (var(--rating-conic)) из global.css.
- * Это делается HTML-слоем под SVG (без foreignObject, чтобы TS не ругался).
- * Сверху — SVG-дуга покраснения (идёт ПРОТИВ часовой, старт в 9 часов) и фото.
+ * База: ровное зелёное кольцо.
+ * Дуга: красная, растёт ПРОТИВ часовой, старт в 9ч. При 0 — дугу не рисуем (нет «точки»).
  */
 export default function AvatarRing({
   src,
   alt = '',
   size = 72,
   thickness = 4,
-  // rating,
   negProgress = 0,
   className = '',
 }: Props) {
   const s = size
   const r = (s - thickness) / 2
   const c = 2 * Math.PI * r
+
+  // ограничим прогресс
   const prog = Math.max(0, Math.min(1, negProgress))
+  const showArc = prog > 0.0001
+
   const inner = s - thickness
   const clipId = useId()
 
-  // Повернуть старт дуги в 9ч и пустить против часовой:
+  // Поворачиваем старт дуги в 9ч и пускаем ПРОТИВ часовой:
+  // применяются справа налево (rotate -> scale -> translate)
   const gTransform = `translate(${s} 0) scale(-1 1) rotate(180 ${s / 2} ${s / 2})`
 
   return (
-    <div className={className} style={{ width: s, height: s, position: 'relative' }}>
-      {/* === Слой 1. Базовое градиентное кольцо (как на главной) === */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          borderRadius: '9999px',
-          background: 'var(--rating-conic)',    // взято из global.css
-          display: 'grid',
-          placeItems: 'center',
-        }}
-      >
-        <div
-          style={{
-            width: inner,
-            height: inner,
-            borderRadius: '9999px',
-            background: '#0f0f15',
-          }}
-        />
-      </div>
-
-      {/* === Слой 2 и 3. Красная дуга + фото (в одном SVG поверх) === */}
-      <svg
-        width={s}
-        height={s}
-        viewBox={`0 0 ${s} ${s}`}
-        style={{ position: 'absolute', inset: 0 }}
-        aria-hidden={alt ? undefined : true}
-      >
+    <div className={className} style={{ width: s, height: s }}>
+      <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} aria-hidden={alt ? undefined : true}>
         <defs>
           <clipPath id={clipId}>
             <circle cx={s / 2} cy={s / 2} r={inner / 2} />
           </clipPath>
         </defs>
 
-        {/* Красная дуга «покраснения» */}
-        <g transform={gTransform}>
-          <circle
-            cx={s / 2}
-            cy={s / 2}
-            r={r}
-            fill="none"
-            stroke="#dc2626" // red-600
-            strokeWidth={thickness}
-            strokeLinecap="round"
-            strokeDasharray={`${prog * c} ${c}`}
-            strokeDashoffset="0"
-          />
-        </g>
+        {/* База — цельное зелёное кольцо */}
+        <circle
+          cx={s / 2}
+          cy={s / 2}
+          r={r}
+          fill="none"
+          stroke="#22c55e"            // green-500
+          strokeWidth={thickness}
+        />
 
-        {/* Фото поверх, обрезанное по кругу */}
+        {/* Красная дуга — рисуем только если prog > 0 (чтобы не было «красной точки») */}
+        {showArc && (
+          <g transform={gTransform}>
+            <circle
+              cx={s / 2}
+              cy={s / 2}
+              r={r}
+              fill="none"
+              stroke="#dc2626"         // red-600
+              strokeWidth={thickness}
+              strokeLinecap="round"
+              strokeDasharray={`${prog * c} ${c}`}
+              strokeDashoffset="0"
+            />
+          </g>
+        )}
+
+        {/* Фото внутри круга */}
         <image
           href={src}
           x={thickness / 2}
@@ -99,7 +84,6 @@ export default function AvatarRing({
           preserveAspectRatio="xMidYMid slice"
         />
       </svg>
-
       {alt ? <span className="sr-only">{alt}</span> : null}
     </div>
   )
