@@ -1,96 +1,97 @@
-
-import React from 'react';
+'use client'
+import React from 'react'
 
 type Props = {
-  src: string;
-  size?: number;       // px, full diameter of avatar incl. ring
-  thickness?: number;  // px, ring stroke width
-  negProgress?: number; // 0..1, how much of the ring is "red"
-  className?: string;
-  alt?: string;
-};
+  src: string
+  alt?: string
+  size?: number        // общий диаметр, px
+  thickness?: number   // толщина кольца, px
+  negProgress?: number // 0..1 — доля покраснения (net)
+  className?: string
+}
 
 /**
- * AvatarRing — минимальный компонент кольца вокруг аватарки.
- * ВАЖНО: Геометрию не меняет — ширина/высота равны `size`.
- * Кольцо рисуется поверх через SVG; «покраснение» — это красная дуга,
- * длина которой пропорциональна `negProgress` (0..1).
+ * База: ровное зелёное кольцо.
+ * Красная дуга: растёт ПРОТИВ часовой от 9ч.
+ * Реализовано без foreignObject/SVG-математики — чистым HTML/CSS (conic-gradient + mask),
+ * чтобы избежать "красной точки" и проблем с типами.
  */
 export default function AvatarRing({
   src,
-  size = 48,
-  thickness = 3,
+  alt = '',
+  size = 72,
+  thickness = 4,
   negProgress = 0,
   className = '',
-  alt = 'avatar',
 }: Props) {
-  const radius = (size - thickness) / 2;      // радиус окружности для stroke
-  const circumference = 2 * Math.PI * radius; // длина окружности
-  const clamped = Math.max(0, Math.min(1, negProgress));
+  const s = size
+  const t = thickness
+  const inner = s - t
+  const prog = Math.max(0, Math.min(1, negProgress))
+  const showArc = prog > 0.0001
+  const deg = prog * 360 // угол покраснения
 
-  // длина дуги красного сегмента
-  const dash = clamped * circumference;
-  const gap = circumference - dash;
-
-  // Чтобы дуга начиналась сверху (на -90deg), поворачиваем svg-группу.
-  // SVG занимает весь size, img находится под ним.
   return (
-    <div
-      className={className}
-      style={{
-        position: 'relative',
-        width: size,
-        height: size,
-        display: 'inline-block',
-      }}
-    >
-      {/* Аватар */}
+    <div className={className} style={{ width: s, height: s, position: 'relative' }}>
+      {/* БАЗОВОЕ КОЛЬЦО: зелёный обод + тёмная внутренняя "пробка" */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: '9999px',
+          background: '#22c55e',          // зелёная база
+          display: 'grid',
+          placeItems: 'center',
+        }}
+      >
+        <div
+          style={{
+            width: inner,
+            height: inner,
+            borderRadius: '9999px',
+            background: '#0f0f15',
+          }}
+        />
+      </div>
+
+      {/* КРАСНАЯ ДУГА: против часовой от 9ч */}
+      {showArc && (
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: '9999px',
+            // conic-gradient всегда растёт ПО часовой; чтобы получить ПРОТИВ —
+            // зеркалим по X и стартуем "с 3ч" (90deg), что после зеркала = 9ч
+            transform: 'scaleX(-1)',
+            background: `conic-gradient(from 90deg, #dc2626 0deg, #dc2626 ${deg}deg, transparent ${deg}deg)`,
+            // маска: превращаем заливку в "обод" нужной толщины
+            WebkitMask: `radial-gradient(circle at 50% 50%, transparent ${inner/2}px, #000 ${inner/2 + 0.5}px)`,
+            mask: `radial-gradient(circle at 50% 50%, transparent ${inner/2}px, #000 ${inner/2 + 0.5}px)`,
+          }}
+        />
+      )}
+
+      {/* ФОТО */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt={alt}
         style={{
-          width: size - thickness * 2,
-          height: size - thickness * 2,
+          position: 'absolute',
+          left: t / 2,
+          top: t / 2,
+          width: inner,
+          height: inner,
           borderRadius: '9999px',
           objectFit: 'cover',
-          position: 'absolute',
-          top: thickness,
-          left: thickness,
+          background: '#1a1a1f',
+          border: '2px solid #fff',
         }}
       />
-
-      {/* SVG-обводка */}
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        style={{ position: 'absolute', top: 0, left: 0 }}
-      >
-        <g transform={`rotate(-90 ${size/2} ${size/2})`}>
-          {/* Базовое «приглушённое» кольцо */}
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke="rgba(255,255,255,0.18)"
-            strokeWidth={thickness}
-          />
-          {/* Красная дуга негативного прогресса */}
-          {clamped > 0 && (
-            <circle
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              fill="none"
-              stroke="rgba(220, 38, 38, 0.95)"  // красный
-              strokeWidth={thickness}
-              strokeLinecap="round"
-              strokeDasharray={`${dash} ${gap}`}
-            />
-          )}
-        </g>
-      </svg>
+      {alt ? <span className="sr-only">{alt}</span> : null}
     </div>
-  );
+  )
 }
