@@ -6,7 +6,7 @@ import {
   resetDemoData, pushEvent, ratingColor
 } from '../../lib/state'
 
-// import AvatarRing from './AvatarRing' // ⬅️ НЕ ИСПОЛЬЗУЕМ, чтобы не ломать геометрию
+import AvatarRing from './AvatarRing'
 
 const MS30D = 30 * 24 * 60 * 60 * 1000
 
@@ -45,24 +45,13 @@ const Thumb = (props:any) => (
   </svg>
 )
 
-/* ===== кап для покраснения кольца + helpers (ТОЛЬКО ЛОГИКА ЦВЕТА, верстку не трогаем) ===== */
+/* ===== кап для покраснения кольца + helper ===== */
 const NEG_CAP = 20 // сколько «чистых» минусов нужно, чтобы окрасить полный круг
-
-// 0..1 — доля покраснения (чистый минус = down - up)
 function negProgressOf(r: Row) {
   const up = r.votesUp ?? 0
   const down = r.votesDown ?? 0
   const netNeg = Math.max(0, down - up)
   return Math.min(1, netNeg / NEG_CAP)
-}
-
-// Локальный конусный градиент: база зелёная, красная дуга растёт ПРОТИВ часовой от 9ч.
-// from 180deg => «9 часов», красный сегмент занимает последние deg градусов.
-function ringFromNeg(progress: number) {
-  const p = Math.max(0, Math.min(1, progress))
-  const deg = Math.round(p * 360)
-  const cut = 360 - deg
-  return `conic-gradient(from 180deg, #22c55e 0deg ${cut}deg, #dc2626 ${cut}deg 360deg)`
 }
 
 /* утилита: найти актуальный Row по id во всех списках (для правого сайдбара) */
@@ -74,6 +63,16 @@ function findRowById(state: AppState, id: number): Row | null {
     lists.await_ours.find(x => x.id === id) ||
     null
   )
+}
+
+/* ===== helpers для дев-меню (не трогают верстку) ===== */
+function forceVotingTs(ts: number) {
+  const d = new Date(ts)
+  const dow = d.getDay()
+  if (dow === 2 || dow === 6) return ts
+  // сдвигаем к ближайшему вторнику
+  const delta = (2 - dow + 7) % 7
+  return ts + delta * 86400_000
 }
 
 export default function ProfilePage(){
@@ -95,7 +94,12 @@ export default function ProfilePage(){
     const t = setInterval(() => setNowTs(Date.now()), 60_000)
     return () => clearInterval(t)
   }, [])
-  const voteDay = isVotingDay(nowTs)
+
+  /* ====== DEV MENU flags (локальные, чтобы ничего не ломать) ====== */
+  const [devForceVotingDay, setDevForceVotingDay] = useState(false)
+  const [devAllowMultiVotes, setDevAllowMultiVotes] = useState(false)
+
+  const voteDay = devForceVotingDay || isVotingDay(nowTs)
 
   const qNorm = q.toLowerCase().replace(/^@/, '')
   const match = (r: Row) => {
@@ -193,14 +197,21 @@ export default function ProfilePage(){
     const ns = clone(state)
     const list = tab === 'mutual' ? ns.lists.mutual : ns.lists.await_their
     const idx = list.findIndex(x => x.id === r.id); if (idx < 0) return
-    const row = { ...list[idx] }; if (row.myVote) return; if (!canVoteOnRow(row, tab, Date.now())) return
+    const row = { ...list[idx] }
+
+    // Учитываем дев-флаги:
+    const nowForCheck = devForceVotingDay ? forceVotingTs(Date.now()) : Date.now()
+    if (!devAllowMultiVotes && row.myVote) return
+    if (!canVoteOnRow({ ...row, myVote: devAllowMultiVotes ? undefined : row.myVote } as Row, tab, nowForCheck)) return
 
     if (dir === 'up')   row.votesUp   = (row.votesUp   ?? 0) + 1
     if (dir === 'down') row.votesDown = (row.votesDown ?? 0) + 1
-    row.myVote = dir; list[idx] = row
+    if (!devAllowMultiVotes) row.myVote = dir
+
+    list[idx] = row
     pushEvent(ns, 'vote', `${row.handle}: ${dir}`); write(ns)
 
-    // ★ обновляем правый сайдбар мгновенно, если выбран этот же профиль
+    // мгновенно обновляем правый сайдбар, если выбран этот профиль
     setSelected(prev => (prev && prev.id === row.id) ? row : prev)
   }
 
@@ -229,7 +240,7 @@ export default function ProfilePage(){
     )
   }
 
-  // ★ берём актуальную запись выбранного профиля из state, чтобы правый блок всегда синхронизировался
+  // актуальная запись выбранного профиля — правый блок всегда синхронизирован
   const selectedRow = selected
     ? (findRowById(state, selected.id) ?? selected)
     : rows[0] ?? null
@@ -316,8 +327,7 @@ export default function ProfilePage(){
         <aside className="card p-5 flex-shrink-0 w-[360px] flex flex-col items-center">
           <div
             className="relative group avatar-ring-xl"
-            // Слева — всегда зелёное кольцо (ваш профиль)
-            style={{ ['--ring-colors' as any]: 'conic-gradient(from 180deg, #22c55e 0deg 360deg)' }}
+            style={{ ['--ring-colors' as any]: 'hsl(120 70% 50%)' }}
           >
             <div className="avatar-ring-xl-inner">
               <img src={yourAvatar} alt="you" className="avatar-xl"/>
@@ -344,13 +354,15 @@ export default function ProfilePage(){
           <div className="space-y-4">
             {rows.length === 0 && <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r => {
-              const can   = canVoteOnRow(r, tab, nowTs)
+              // учитываем дев-флаг "всегда день голосования"
+              const nowForCheck = devForceVotingDay ? forceVotingTs(nowTs) : nowTs
+              const can   = canVoteOnRow(r, tab, nowForCheck)
               const b     = statusBadge(r)
               const whyDisabled =
-                r.myVote ? 'You have already voted for this profile'
+                (r.myVote && !devAllowMultiVotes) ? 'You have already voted for this profile'
                 : (tab === 'await_ours' ? 'Voting is not available in this tab'
                 : ((r.statusMode ?? 'online') !== 'online' ? 'User is absent (short/long)'
-                : (!isVotingDay(nowTs) ? 'Voting is available only on Tuesday and Saturday'
+                : (!isVotingDay(nowForCheck) ? 'Voting is available only on Tuesday and Saturday'
                 : ((r.days ?? 0) < 4 ? 'Available after 4 days in lists' : ''))))
 
               return (
@@ -379,15 +391,13 @@ export default function ProfilePage(){
                   {/* LEFT: аватар + статус под аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
-                      {/* ВОЗВРАТ К ИСХОДНОЙ ГЕОМЕТРИИ + локальный градиент кольца */}
-                      <div
-                        className="avatar-ring-sm"
-                        style={{ ['--ring-colors' as any]: ringFromNeg(negProgressOf(r)) }}
-                      >
-                        <div className="avatar-ring-sm-inner">
-                          <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
-                        </div>
-                      </div>
+                      {/* AvatarRing как был */}
+                      <AvatarRing
+                        src={r.avatarUrl || 'https://unavatar.io/x/twitter'}
+                        size={48}
+                        thickness={3}
+                        negProgress={negProgressOf(r)}
+                      />
                       <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full ${b.className}`}>{b.label}</div>
                     </div>
                     <div className="leading-5">
@@ -396,9 +406,9 @@ export default function ProfilePage(){
                     </div>
                   </div>
 
-                  {/* MIDDLE: кнопки голосования — ТОЛЬКО в день голосования */}
+                  {/* MIDDLE: кнопки голосования — ТОЛЬКО в день голосования (или devForce) */}
                   {voteDay && (
-                    <div className="flex items中心 gap-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                       {/* ЗА */}
                       <button
                         disabled={!can}
@@ -473,16 +483,13 @@ export default function ProfilePage(){
           <div className="card p-5 flex flex-col items-center">
             {selectedRow ? (
               <>
-                {/* ВОЗВРАТ К ИСХОДНОЙ ГЕОМЕТРИИ + такой же локальный градиент */}
-                <div
-                  className="avatar-ring-xl"
-                  style={{ ['--ring-colors' as any]: ringFromNeg(negProgressOf(selectedRow)) }}
-                >
-                  <div className="avatar-ring-xl-inner">
-                    <img src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'} alt={selectedRow.handle} className="avatar-xl"/>
-                  </div>
-                </div>
-
+                {/* справа — тоже AvatarRing, обновляется мгновенно */}
+                <AvatarRing
+                  src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'}
+                  size={120}
+                  thickness={5}
+                  negProgress={negProgressOf(selectedRow)}
+                />
                 <div className="mt-5 text-center">
                   <div className="font-semibold text-lg">{selectedRow.name}</div>
                   <div className="text-sm text-white/70">{selectedRow.handle}</div>
@@ -497,6 +504,48 @@ export default function ProfilePage(){
             )}
           </div>
         </aside>
+      </div>
+
+      {/* ====== DEV MENU (fixed, не влияет на геометрию) ====== */}
+      <div className="fixed bottom-5 right-6 z-50 card px-4 py-3 text-sm">
+        <div className="font-semibold mb-2">Dev menu</div>
+        <label className="flex items-center gap-2 mb-2">
+          <input type="checkbox" checked={devForceVotingDay} onChange={e => setDevForceVotingDay(e.target.checked)} />
+          <span>Всегда день голосования</span>
+        </label>
+        <label className="flex items-center gap-2 mb-3">
+          <input type="checkbox" checked={devAllowMultiVotes} onChange={e => setDevAllowMultiVotes(e.target.checked)} />
+          <span>Мульти-голоса</span>
+        </label>
+
+        <div className="flex items-center gap-2">
+          <button
+            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15"
+            onClick={() => {
+              if (!selectedRow) return
+              const ns = clone(state)
+              const row = findRowById(ns, selectedRow.id)
+              if (!row) return
+              row.votesUp = (row.votesUp ?? 0) + 1
+              pushEvent(ns, 'vote', `${row.handle}: dev +1 up`)
+              saveState(ns); setState(ns)
+              setSelected(prev => prev && prev.id === row.id ? { ...row } : prev)
+            }}
+          >+1 up</button>
+          <button
+            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15"
+            onClick={() => {
+              if (!selectedRow) return
+              const ns = clone(state)
+              const row = findRowById(ns, selectedRow.id)
+              if (!row) return
+              row.votesDown = (row.votesDown ?? 0) + 1
+              pushEvent(ns, 'vote', `${row.handle}: dev +1 down`)
+              saveState(ns); setState(ns)
+              setSelected(prev => prev && prev.id === row.id ? { ...row } : prev)
+            }}
+          >+1 down</button>
+        </div>
       </div>
 
       {/* ===== Кастомный confirm-диалог (как туториал) ===== */}
