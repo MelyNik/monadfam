@@ -45,15 +45,6 @@ const Thumb = (props:any) => (
   </svg>
 )
 
-/* ===== кап для покраснения кольца + helper ===== */
-const NEG_CAP = 20 // сколько чистых минусов нужно, чтобы окрасить полный круг
-function negProgressOf(r: Row) {
-  const up = r.votesUp ?? 0
-  const down = r.votesDown ?? 0
-  const netNeg = Math.max(0, down - up)
-  return Math.min(1, netNeg / NEG_CAP)
-}
-
 export default function ProfilePage(){
   const [state, setState] = useState<AppState>(() => loadState())
   const [tab, setTab]     = useState<Tab>('mutual')
@@ -150,16 +141,17 @@ export default function ProfilePage(){
     ns.removed = [{ from, row: r }, ...ns.removed]; pushEvent(ns, 'soft-remove', `${r.handle}: removed from ${from}`); write(ns)
   }
   const restoreRemoved = () => {
-    if (!removed.length) return
-    const ns = clone(state)
-    removed.forEach(({ from, row }) => {
-      if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
-      if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours]
-    })
-    ns.removed = []
-    pushEvent(ns, 'restore', `Restored ${removed.length} profiles`)
-    write(ns)
-  }
+  if (!removed.length) return
+  const ns = clone(state)
+  removed.forEach(({ from, row }) => {
+    if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
+    if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours]
+  })
+  ns.removed = []
+  pushEvent(ns, 'restore', `Restored ${removed.length} profiles`)
+  write(ns)
+}
+
 
   const toOnline = () => { const ns = clone(state)
     if (ns.status.mode === 'long') { ns.status.longActive = false; ns.status.longResetAt = Date.now() + MS30D }
@@ -425,13 +417,14 @@ export default function ProfilePage(){
                   {/* LEFT: аватар + статус под аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
-                      {/* заменили внутренний аватар на AvatarRing — размеры сохранены */}
-                      <AvatarRing
-                        src={r.avatarUrl || 'https://unavatar.io/x/twitter'}
-                        size={48}
-                        thickness={3}
-                        negProgress={negProgressOf(r)}
-                      />
+                      <div
+                        className="avatar-ring-sm"
+                        style={{ ['--ring-colors' as any]: ratingColor(r) }}
+                      >
+                        <div className="avatar-ring-sm-inner">
+                          <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
+                        </div>
+                      </div>
                       <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full ${b.className}`}>{b.label}</div>
                     </div>
                     <div className="leading-5">
@@ -517,13 +510,14 @@ export default function ProfilePage(){
           <div className="card p-5 flex flex-col items-center">
             {selectedRow ? (
               <>
-                {/* заменили внутренний аватар на AvatarRing — размеры сохранены */}
-                <AvatarRing
-                  src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'}
-                  size={120}
-                  thickness={5}
-                  negProgress={negProgressOf(selectedRow)}
-                />
+                <div
+                  className="avatar-ring-xl"
+                  style={{ ['--ring-colors' as any]: ratingColor(selectedRow) }}
+                >
+                  <div className="avatar-ring-xl-inner">
+                    <img src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'} alt={selectedRow.handle} className="avatar-xl"/>
+                  </div>
+                </div>
                 <div className="mt-5 text-center">
                   <div className="font-semibold text-lg">{selectedRow.name}</div>
                   <div className="text-sm text-white/70">{selectedRow.handle}</div>
