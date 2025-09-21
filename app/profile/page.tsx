@@ -1,12 +1,11 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import {
+import AvatarRing from './AvatarRing'
   AppState, Row, loadState, saveState, clone,
   startOfMonthUTC, nextMonthStartFrom,
   resetDemoData, pushEvent, ratingColor
 } from '../../lib/state'
-
-import AvatarRing from './AvatarRing'
 
 const MS30D = 30 * 24 * 60 * 60 * 1000
 
@@ -38,11 +37,21 @@ function statusBadge(r: Row) {
   return { label: 'лонг', className: 'bg-red-600/25 text-red-300' }
 }
 
-/* Один и тот же знак «палец», для down — поворот */
+/* Один и тот же знак «палец», для down — поворот (визуально идентичные) */
 const Thumb = (props:any) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" {...props}>
     <path d="M2 10h4v12H2V10zm8 12h6a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4l.8-4.2A2 2 0 0 0 10 5l-4 7v10z"/>
   </svg>
+
+/* ===== кап для покраснения кольца + helper ===== */
+const NEG_CAP = 20; // сколько «чистых» минусов нужно, чтобы окрасить полный круг
+function negProgressOf(r: Row) {
+  const up = r.votesUp ?? 0;
+  const down = r.votesDown ?? 0;
+  const netNeg = Math.max(0, down - up);
+  return Math.min(1, netNeg / NEG_CAP);
+}
+
 )
 
 export default function ProfilePage(){
@@ -51,26 +60,13 @@ export default function ProfilePage(){
   const [q, setQ]         = useState('')
   const [selected, setSelected] = useState<Row | null>(null)
 
-  // ===== DEV FLAGS (только для теста рейтинга/голосования; не меняют геометрию)
-  const [devForceVotingDay, setDevForceVotingDay]   = useState(false)
-  const [devUnlimitedVoting, setDevUnlimitedVoting] = useState(false)
-  const [devSelId, setDevSelId]                     = useState<number | null>(null)
-
-  // ===== кастомный confirm (вместо window.confirm)
-  type Resolver = (v: boolean) => void
-  const [confirmBox, setConfirmBox] = useState<{open:boolean; message:string; resolve?:Resolver}>({ open:false, message:'' })
-  const ask = (msg = 'Confirm your choice?') =>
-    new Promise<boolean>((resolve) => setConfirmBox({ open: true, message: msg, resolve }))
-  const closeConfirm = (v: boolean) => { confirmBox.resolve?.(v); setConfirmBox({ open:false, message:'' }) }
-
-  // "текущее время" раз в минуту — чтобы в полночь кнопки появились/исчезли
+  // обновляем "текущее время" раз в минуту, чтобы в полночь кнопки появились/исчезли
   const [nowTs, setNowTs] = useState(() => Date.now())
   useEffect(() => {
     const t = setInterval(() => setNowTs(Date.now()), 60_000)
     return () => clearInterval(t)
   }, [])
-  // Форс-день голосования включается dev-меню
-  const voteDay = devForceVotingDay || isVotingDay(nowTs)
+  const voteDay = isVotingDay(nowTs)
 
   const qNorm = q.toLowerCase().replace(/^@/, '')
   const match = (r: Row) => {
@@ -108,21 +104,16 @@ export default function ProfilePage(){
     return list.filter(match)
   }, [tab, lists, q])
 
-  // дефолт выбираем первого в текущем списке для dev-меню
-  useEffect(() => {
-    if (devSelId == null && rows.length) setDevSelId(rows[0].id)
-  }, [rows, devSelId])
-
   const counts = { mutual: lists.mutual.length, await_their: lists.await_their.length, await_ours: lists.await_ours.length }
   const write = (ns: AppState) => { saveState(ns); setState(ns) }
+  const ask = (msg = 'Confirm your choice?') => window.confirm(msg)
 
-  // ===== действия с подтверждением
-  const unfollowFromMutual = async (r: Row) => { if (!(await ask())) return; const ns = clone(state)
+  const unfollowFromMutual = (r: Row) => { if (!ask()) return; const ns = clone(state)
     ns.lists.mutual = ns.lists.mutual.filter(x => x.id !== r.id)
     ns.lists.await_ours = [{ ...r, days: 0 }, ...ns.lists.await_ours]
     pushEvent(ns, 'move', `${r.handle}: mutual → await_ours`); write(ns)
   }
-  const unfollowFromAwaitTheir = async (r: Row) => { if (!(await ask())) return; const ns = clone(state)
+  const unfollowFromAwaitTheir = (r: Row) => { if (!ask()) return; const ns = clone(state)
     ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     pushEvent(ns, 'remove', `${r.handle}: removed from await_their`); write(ns)
   }
@@ -131,27 +122,20 @@ export default function ProfilePage(){
     ns.lists.mutual     = [{ ...r, days: r.days ?? 0 }, ...ns.lists.mutual]
     pushEvent(ns, 'move', `${r.handle}: await_ours → mutual`); write(ns)
   }
-  const declineFromAwaitOurs = async (r: Row) => { if (!(await ask())) return; const ns = clone(state)
+  const declineFromAwaitOurs = (r: Row) => { if (!ask()) return; const ns = clone(state)
     ns.lists.await_ours = ns.lists.await_ours.filter(x => x.id !== r.id)
     pushEvent(ns, 'remove', `${r.handle}: declined in await_ours`); write(ns)
   }
-  const softRemove = async (from: 'await_their' | 'await_ours', r: Row) => { if (!(await ask())) return; const ns = clone(state)
+  const softRemove = (from: 'await_their' | 'await_ours', r: Row) => { if (!ask()) return; const ns = clone(state)
     if (from === 'await_their') ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     if (from === 'await_ours')  ns.lists.await_ours  = ns.lists.await_ours .filter(x => x.id !== r.id)
     ns.removed = [{ from, row: r }, ...ns.removed]; pushEvent(ns, 'soft-remove', `${r.handle}: removed from ${from}`); write(ns)
   }
-  const restoreRemoved = () => {
-  if (!removed.length) return
-  const ns = clone(state)
-  removed.forEach(({ from, row }) => {
-    if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
-    if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours]
-  })
-  ns.removed = []
-  pushEvent(ns, 'restore', `Restored ${removed.length} profiles`)
-  write(ns)
-}
-
+  const restoreRemoved = () => { if (!removed.length) return; const ns = clone(state)
+    removed.forEach(({ from, row }) => { if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
+                                         if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours] })
+    ns.removed = []; pushEvent(ns, 'restore', `Restored ${removed.length} profiles`); write(ns)
+  }
 
   const toOnline = () => { const ns = clone(state)
     if (ns.status.mode === 'long') { ns.status.longActive = false; ns.status.longResetAt = Date.now() + MS30D }
@@ -176,33 +160,14 @@ export default function ProfilePage(){
     pushEvent(ns, 'status:set', 'You switched to LONG'); write(ns)
   }
 
-  // Голосование: учитываем dev-флаги (безлимит и форс-день)
   const vote = (r: Row, dir: 'up' | 'down') => {
     const ns = clone(state)
     const list = tab === 'mutual' ? ns.lists.mutual : ns.lists.await_their
     const idx = list.findIndex(x => x.id === r.id); if (idx < 0) return
-    const row = { ...list[idx] }
-
-    const baseAllowed = canVoteOnRow(row, tab, Date.now())
-    const dayBypassAllowed =
-      (tab !== 'await_ours') &&
-      ((row.statusMode ?? 'online') === 'online') &&
-      ((row.days ?? 0) >= 4) &&
-      !row.myVote
-
-    const canDev = devUnlimitedVoting
-      ? true
-      : (baseAllowed || (devForceVotingDay && dayBypassAllowed))
-
-    if (!canDev) return
-
+    const row = { ...list[idx] }; if (row.myVote) return; if (!canVoteOnRow(row, tab, Date.now())) return
     if (dir === 'up')   row.votesUp   = (row.votesUp   ?? 0) + 1
     if (dir === 'down') row.votesDown = (row.votesDown ?? 0) + 1
-    if (!devUnlimitedVoting) row.myVote = dir
-
-    list[idx] = row
-    pushEvent(ns, 'vote', `${row.handle}: ${dir}`)
-    write(ns)
+    row.myVote = dir; list[idx] = row; pushEvent(ns, 'vote', `${row.handle}: ${dir}`); write(ns)
   }
 
   const shortCountdown = useMemo(() => {
@@ -258,39 +223,6 @@ export default function ProfilePage(){
       </button>
 
       <h1 className="text-3xl font-bold mb-6 text-center">Profile</h1>
-
-      {/* ===== DEV MENU (добавлено; остальная геометрия не менялась) ===== */}
-      <div className="card p-3 mb-4">
-        <div className="text-xs uppercase tracking-wider text-white/60">Dev menu</div>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={devForceVotingDay} onChange={e=>setDevForceVotingDay(e.target.checked)} />
-            <span>День голосования (форс)</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={devUnlimitedVoting} onChange={e=>setDevUnlimitedVoting(e.target.checked)} />
-            <span>Безлимит голосования</span>
-          </label>
-          <select
-            className="rounded-md border border-white/15 bg-transparent px-2 py-1"
-            value={devSelId ?? ''} onChange={e=>setDevSelId(Number(e.target.value)||null)}
-          >
-            {rows.map(r => (
-              <option key={r.id} value={r.id}>{r.name || r.handle || `#${r.id}`}</option>
-            ))}
-          </select>
-          <button
-            className="h-8 px-3 rounded-lg bg-emerald-600 text-white text-sm disabled:opacity-50"
-            disabled={!devSelId}
-            onClick={() => { const r = rows.find(x=>x.id===devSelId); if (r) vote(r,'up') }}
-          >+1 выбранному</button>
-          <button
-            className="h-8 px-3 rounded-lg bg-red-600 text-white text-sm disabled:opacity-50"
-            disabled={!devSelId}
-            onClick={() => { const r = rows.find(x=>x.id===devSelId); if (r) vote(r,'down') }}
-          >−1 выбранному</button>
-        </div>
-      </div>
 
       {/* statuses + restore */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -373,22 +305,13 @@ export default function ProfilePage(){
           <div className="space-y-4">
             {rows.length === 0 && <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r => {
-              // Базовая проверка + dev-блокировки
-              const baseCan = canVoteOnRow(r, tab, nowTs)
-              const dayBypassAllowed =
-                (tab !== 'await_ours') &&
-                ((r.statusMode ?? 'online') === 'online') &&
-                ((r.days ?? 0) >= 4) &&
-                !r.myVote
-              const can   = devUnlimitedVoting ? true : (baseCan || (devForceVotingDay && dayBypassAllowed))
-
+              const can   = canVoteOnRow(r, tab, nowTs)
               const b     = statusBadge(r)
               const whyDisabled =
-                devUnlimitedVoting ? '' :
                 r.myVote ? 'You have already voted for this profile'
                 : (tab === 'await_ours' ? 'Voting is not available in this tab'
                 : ((r.statusMode ?? 'online') !== 'online' ? 'User is absent (short/long)'
-                : (!voteDay ? 'Voting is available only on Tuesday and Saturday'
+                : (!isVotingDay(nowTs) ? 'Voting is available only on Tuesday and Saturday'
                 : ((r.days ?? 0) < 4 ? 'Available after 4 days in lists' : ''))))
 
               return (
@@ -400,31 +323,23 @@ export default function ProfilePage(){
                       ? 'border-red-400/30 bg-red-500/5'
                       : 'border-white/10 bg-white/5'}`}
                 >
-                  {/* МЯГКОЕ УДАЛЕНИЕ × — центр в правом верхнем углу карточки */}
-                  {(tab === 'await_their' || tab === 'await_ours') && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); softRemove(tab as ('await_their' | 'await_ours'), r) }}
-                      title="Remove from this tab"
-                      aria-label="Remove"
-                      className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2
-                                 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20
-                                 text-white/80 leading-none flex items-center justify-center z-10"
-                    >
-                      ×
-                    </button>
-                  )}
+                    {/* МЯГКОЕ УДАЛЕНИЕ × — ТОЛЬКО в await_their / await_ours */}
+    {(tab === 'await_their' || tab === 'await_ours') && (
+      <button
+        onClick={(e) => { e.stopPropagation(); softRemove(tab as ('await_their' | 'await_ours'), r) }}
+        title="Remove from this tab"
+        aria-label="Remove"
+        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20
+                   text-white/80 leading-none flex items-center justify-center"
+      >
+        ×
+      </button>
+    )}
 
                   {/* LEFT: аватар + статус под аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
-                      <div
-                        className="avatar-ring-sm"
-                        style={{ ['--ring-colors' as any]: ratingColor(r) }}
-                      >
-                        <div className="avatar-ring-sm-inner">
-                          <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
-                        </div>
-                      </div>
+                      <AvatarRing src={r.avatarUrl || 'https://unavatar.io/x/twitter'} size={48} thickness={3} negProgress={negProgressOf(r)} />
                       <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full ${b.className}`}>{b.label}</div>
                     </div>
                     <div className="leading-5">
@@ -433,7 +348,7 @@ export default function ProfilePage(){
                     </div>
                   </div>
 
-                  {/* MIDDLE: кнопки голосования — ТОЛЬКО в день голосования (или форс) */}
+                  {/* MIDDLE: кнопки голосования — показываем ТОЛЬКО в день голосования */}
                   {voteDay && (
                     <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                       {/* ЗА */}
@@ -510,14 +425,7 @@ export default function ProfilePage(){
           <div className="card p-5 flex flex-col items-center">
             {selectedRow ? (
               <>
-                <div
-                  className="avatar-ring-xl"
-                  style={{ ['--ring-colors' as any]: ratingColor(selectedRow) }}
-                >
-                  <div className="avatar-ring-xl-inner">
-                    <img src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'} alt={selectedRow.handle} className="avatar-xl"/>
-                  </div>
-                </div>
+                <AvatarRing src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'} size={120} thickness={5} negProgress={negProgressOf(selectedRow)} />
                 <div className="mt-5 text-center">
                   <div className="font-semibold text-lg">{selectedRow.name}</div>
                   <div className="text-sm text-white/70">{selectedRow.handle}</div>
@@ -533,20 +441,6 @@ export default function ProfilePage(){
           </div>
         </aside>
       </div>
-
-      {/* ===== Кастомный confirm-диалог (как туториал) ===== */}
-      {confirmBox.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="w-[92%] max-w-[520px] rounded-2xl border border-white/10 bg-[rgba(10,10,16,0.96)] p-6 shadow-2xl">
-            <h3 className="text-2xl font-bold mb-2">Confirm</h3>
-            <p className="text-white/80">{confirmBox.message || 'Confirm your choice?'}</p>
-            <div className="mt-5 flex gap-2 justify-end">
-              <button className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15" onClick={() => closeConfirm(false)}>Cancel</button>
-              <button className="px-3 py-2 rounded-xl bg-[#7C5CFF] hover:bg-[#9A86FF]" onClick={() => closeConfirm(true)}>Confirm</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
