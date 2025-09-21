@@ -10,6 +10,16 @@ import AvatarRing from './AvatarRing'
 
 const MS30D = 30 * 24 * 60 * 60 * 1000
 
+/* ===== кап для покраснения кольца + helper ===== */
+const NEG_CAP = 20 // сколько чистых минусов нужно, чтобы окрасить полный круг
+function negProgressOf(r: Row) {
+  const up = r.votesUp ?? 0
+  const down = r.votesDown ?? 0
+  const netNeg = Math.max(0, down - up)
+  return Math.min(1, netNeg / NEG_CAP)
+}
+
+
 function fmtLeft(ms: number) {
   const sec = Math.max(0, Math.floor(ms / 1000))
   const d = Math.floor(sec / 86400)
@@ -417,16 +427,18 @@ export default function ProfilePage(){
                   {/* LEFT: аватар + статус под аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
-                      <div
-                        className="avatar-ring-sm"
-                        style={{ ['--ring-colors' as any]: ratingColor(r) }}
-                      >
-                        <div className="avatar-ring-sm-inner">
-                          <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
-                        </div>
-                      </div>
-                      <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full ${b.className}`}>{b.label}</div>
-                    </div>
+  {/* Геометрия сохранена: 51×51 = 44 (avatar-sm) + 2*(2 + 1.5) */}
+  <div style={{ width: 51, height: 51, display: 'grid', placeItems: 'center' }}>
+    <AvatarRing
+      src={r.avatarUrl || 'https://unavatar.io/x/twitter'}
+      size={51}        // общий размер как у текущей оболочки
+      thickness={2}    // толщина кольца = var(--ring-sm)
+      negProgress={negProgressOf(r)} // краснеет против часовой от 9ч
+    />
+  </div>
+  <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full ${b.className}`}>{b.label}</div>
+</div>
+
                     <div className="leading-5">
                       <div className="font-semibold">{r.name}</div>
                       <div className="text-white/70 text-sm">{r.handle}</div>
