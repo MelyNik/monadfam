@@ -3,95 +3,98 @@ import React from 'react'
 
 type Props = {
   src: string
-  alt?: string
-  size?: number        // общий диаметр, px
-  thickness?: number   // толщина кольца, px
-  negProgress?: number // 0..1 — доля покраснения (net)
-  className?: string
+  size?: number        // внешний размер
+  thickness?: number   // ширина кольца
+  negProgress?: number // 0..1 — красная дуга (против часовой)
+  posProgress?: number // 0..1 — зелёная дуга (по часовой)
 }
 
-/**
- * База: ровное зелёное кольцо.
- * Красная дуга: растёт ПРОТИВ часовой от 9ч.
- * Реализовано без foreignObject/SVG-математики — чистым HTML/CSS (conic-gradient + mask),
- * чтобы избежать "красной точки" и проблем с типами.
- */
 export default function AvatarRing({
   src,
-  alt = '',
-  size = 72,
+  size = 64,
   thickness = 4,
   negProgress = 0,
-  className = '',
+  posProgress = 0,
 }: Props) {
   const s = size
-  const t = thickness
-  const inner = s - t
-  const prog = Math.max(0, Math.min(1, negProgress))
-  const showArc = prog > 0.0001
-  const deg = prog * 360 // угол покраснения
+  const c = s / 2
+  const r = c - thickness / 2
+
+  const neg = Math.max(0, Math.min(1, negProgress))
+  const pos = Math.max(0, Math.min(1, posProgress))
 
   return (
-    <div className={className} style={{ width: s, height: s, position: 'relative' }}>
-      {/* БАЗОВОЕ КОЛЬЦО: зелёный обод + тёмная внутренняя "пробка" */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          borderRadius: '9999px',
-          background: '#22c55e',          // зелёная база
-          display: 'grid',
-          placeItems: 'center',
-        }}
-      >
-        <div
-          style={{
-            width: inner,
-            height: inner,
-            borderRadius: '9999px',
-            background: '#0f0f15',
-          }}
-        />
-      </div>
-
-      {/* КРАСНАЯ ДУГА: против часовой от 9ч */}
-      {showArc && (
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute',
-            inset: 0,
-            borderRadius: '9999px',
-            // conic-gradient всегда растёт ПО часовой; чтобы получить ПРОТИВ —
-            // зеркалим по X и стартуем "с 3ч" (90deg), что после зеркала = 9ч
-            transform: 'scaleX(-1)',
-            background: `conic-gradient(from 90deg, #dc2626 0deg, #dc2626 ${deg}deg, transparent ${deg}deg)`,
-            // маска: превращаем заливку в "обод" нужной толщины
-            WebkitMask: `radial-gradient(circle at 50% 50%, transparent ${inner/2}px, #000 ${inner/2 + 0.5}px)`,
-            mask: `radial-gradient(circle at 50% 50%, transparent ${inner/2}px, #000 ${inner/2 + 0.5}px)`,
-          }}
-        />
-      )}
-
-      {/* ФОТО */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
+    <div style={{ position: 'relative', width: s, height: s }}>
+      {/* аватар */}
       <img
+        alt=""
         src={src}
-        alt={alt}
         style={{
-          position: 'absolute',
-          left: t / 2,
-          top: t / 2,
-          width: inner,
-          height: inner,
-          borderRadius: '9999px',
+          width: s - thickness * 2,
+          height: s - thickness * 2,
+          borderRadius: '999px',
           objectFit: 'cover',
-          background: '#1a1a1f',
-          border: '2px solid #fff',
+          position: 'absolute',
+          left: thickness,
+          top: thickness,
         }}
       />
-      {alt ? <span className="sr-only">{alt}</span> : null}
+
+      {/* кольца */}
+      <svg
+        width={s}
+        height={s}
+        viewBox={`0 0 ${s} ${s}`}
+        style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+      >
+        {/* базовое кольцо */}
+        <circle
+          cx={c}
+          cy={c}
+          r={r}
+          fill="none"
+          stroke="rgba(255,255,255,0.18)"
+          strokeWidth={thickness}
+        />
+
+        {/* ЗЕЛЁНАЯ дуга — по часовой, старт из «9 часов» (поворот на 180°) */}
+        {pos > 0 && (
+          <g transform={`rotate(180 ${c} ${c})`}>
+            <circle
+              cx={c}
+              cy={c}
+              r={r}
+              fill="none"
+              stroke="hsl(150 70% 50%)"
+              strokeWidth={thickness}
+              strokeLinecap="round"
+              pathLength={1}
+              strokeDasharray={`${pos} 1`}
+              strokeDashoffset={0}
+              style={{ filter: 'drop-shadow(0 0 4px rgba(0,255,170,0.35))' }}
+            />
+          </g>
+        )}
+
+        {/* КРАСНАЯ дуга — против часовой от «9 часов» (зеркалим по X и поворачиваем) */}
+        {neg > 0 && (
+          <g transform={`translate(${s} 0) scale(-1 1) rotate(180 ${c} ${c})`}>
+            <circle
+              cx={c}
+              cy={c}
+              r={r}
+              fill="none"
+              stroke="hsl(0 75% 55%)"
+              strokeWidth={thickness}
+              strokeLinecap="round"
+              pathLength={1}
+              strokeDasharray={`${neg} 1`}
+              strokeDashoffset={0}
+              style={{ filter: 'drop-shadow(0 0 4px rgba(255,60,60,0.35))' }}
+            />
+          </g>
+        )}
+      </svg>
     </div>
   )
 }

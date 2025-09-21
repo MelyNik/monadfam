@@ -45,6 +45,25 @@ const Thumb = (props:any) => (
   </svg>
 )
 
+// --- прогресс колец: сколько «чистых» минусов/плюсов окрасит полный круг
+const NEG_CAP = 20
+const POS_CAP = 20
+
+function negProgressOf(r: Row) {
+  const up = r.votesUp ?? 0
+  const down = r.votesDown ?? 0
+  const netNeg = Math.max(0, down - up)
+  return Math.min(1, netNeg / NEG_CAP)
+}
+
+function posProgressOf(r: Row) {
+  const up = r.votesUp ?? 0
+  const down = r.votesDown ?? 0
+  const netPos = Math.max(0, up - down)
+  return Math.min(1, netPos / POS_CAP)
+}
+
+
 export default function ProfilePage(){
   const [state, setState] = useState<AppState>(() => loadState())
   const [tab, setTab]     = useState<Tab>('mutual')
@@ -417,14 +436,14 @@ export default function ProfilePage(){
                   {/* LEFT: аватар + статус под аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
-                      <div
-                        className="avatar-ring-sm"
-                        style={{ ['--ring-colors' as any]: ratingColor(r) }}
-                      >
-                        <div className="avatar-ring-sm-inner">
-                          <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
-                        </div>
-                      </div>
+                      <AvatarRing
+  src={r.avatarUrl || 'https://unavatar.io/x/twitter'}
+  size={48}
+  thickness={3}
+  negProgress={negProgressOf(r)}
+  posProgress={posProgressOf(r)}
+/>
+
                       <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full ${b.className}`}>{b.label}</div>
                     </div>
                     <div className="leading-5">
@@ -510,14 +529,14 @@ export default function ProfilePage(){
           <div className="card p-5 flex flex-col items-center">
             {selectedRow ? (
               <>
-                <div
-                  className="avatar-ring-xl"
-                  style={{ ['--ring-colors' as any]: ratingColor(selectedRow) }}
-                >
-                  <div className="avatar-ring-xl-inner">
-                    <img src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'} alt={selectedRow.handle} className="avatar-xl"/>
-                  </div>
-                </div>
+                <AvatarRing
+  src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'}
+  size={120}
+  thickness={5}
+  negProgress={negProgressOf(selectedRow)}
+  posProgress={posProgressOf(selectedRow)}
+/>
+
                 <div className="mt-5 text-center">
                   <div className="font-semibold text-lg">{selectedRow.name}</div>
                   <div className="text-sm text-white/70">{selectedRow.handle}</div>
