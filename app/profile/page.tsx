@@ -5,7 +5,8 @@ import {
   startOfMonthUTC, nextMonthStartFrom,
   resetDemoData, pushEvent, ratingColor
 } from '../../lib/state'
-import AvatarRing from './AvatarRing' // ⬅️ добавлено
+
+import AvatarRing from './AvatarRing'
 
 const MS30D = 30 * 24 * 60 * 60 * 1000
 
@@ -37,15 +38,15 @@ function statusBadge(r: Row) {
   return { label: 'лонг', className: 'bg-red-600/25 text-red-300' }
 }
 
-/* Один и тот же знак «палец», для down — поворот (визуально идентичные) */
+/* Один и тот же знак «палец», для down — поворот */
 const Thumb = (props:any) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" {...props}>
     <path d="M2 10h4v12H2V10zm8 12h6a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4l.8-4.2A2 2 0 0 0 10 5l-4 7v10z"/>
   </svg>
 )
 
-/* ===== кап для «покраснения» кольца и helper прогресса ===== */
-const NEG_CAP = 20 // сколько «чистых» минусов нужно, чтобы покрасить полный круг
+/* ===== кап для покраснения кольца + helper ===== */
+const NEG_CAP = 20 // сколько чистых минусов нужно, чтобы окрасить полный круг
 function negProgressOf(r: Row) {
   const up = r.votesUp ?? 0
   const down = r.votesDown ?? 0
@@ -59,18 +60,26 @@ export default function ProfilePage(){
   const [q, setQ]         = useState('')
   const [selected, setSelected] = useState<Row | null>(null)
 
-  /* ===== DEV: флаги для теста голосования/рейтинга ===== */
+  // ===== DEV FLAGS (только для теста рейтинга/голосования; не меняют геометрию)
   const [devForceVotingDay, setDevForceVotingDay]   = useState(false)
   const [devUnlimitedVoting, setDevUnlimitedVoting] = useState(false)
   const [devSelId, setDevSelId]                     = useState<number | null>(null)
 
-  // обновляем "текущее время" раз в минуту
+  // ===== кастомный confirm (вместо window.confirm)
+  type Resolver = (v: boolean) => void
+  const [confirmBox, setConfirmBox] = useState<{open:boolean; message:string; resolve?:Resolver}>({ open:false, message:'' })
+  const ask = (msg = 'Confirm your choice?') =>
+    new Promise<boolean>((resolve) => setConfirmBox({ open: true, message: msg, resolve }))
+  const closeConfirm = (v: boolean) => { confirmBox.resolve?.(v); setConfirmBox({ open:false, message:'' }) }
+
+  // "текущее время" раз в минуту — чтобы в полночь кнопки появились/исчезли
   const [nowTs, setNowTs] = useState(() => Date.now())
   useEffect(() => {
     const t = setInterval(() => setNowTs(Date.now()), 60_000)
     return () => clearInterval(t)
   }, [])
-  const voteDay = devForceVotingDay || isVotingDay(nowTs) // ⬅️ форс-день из dev
+  // Форс-день голосования включается dev-меню
+  const voteDay = devForceVotingDay || isVotingDay(nowTs)
 
   const qNorm = q.toLowerCase().replace(/^@/, '')
   const match = (r: Row) => {
@@ -108,21 +117,21 @@ export default function ProfilePage(){
     return list.filter(match)
   }, [tab, lists, q])
 
-  // дефолт выбора в dev-меню
+  // дефолт выбираем первого в текущем списке для dev-меню
   useEffect(() => {
     if (devSelId == null && rows.length) setDevSelId(rows[0].id)
   }, [rows, devSelId])
 
   const counts = { mutual: lists.mutual.length, await_their: lists.await_their.length, await_ours: lists.await_ours.length }
   const write = (ns: AppState) => { saveState(ns); setState(ns) }
-  const ask = (msg = 'Confirm your choice?') => window.confirm(msg)
 
-  const unfollowFromMutual = (r: Row) => { if (!ask()) return; const ns = clone(state)
+  // ===== действия с подтверждением
+  const unfollowFromMutual = async (r: Row) => { if (!(await ask())) return; const ns = clone(state)
     ns.lists.mutual = ns.lists.mutual.filter(x => x.id !== r.id)
     ns.lists.await_ours = [{ ...r, days: 0 }, ...ns.lists.await_ours]
     pushEvent(ns, 'move', `${r.handle}: mutual → await_ours`); write(ns)
   }
-  const unfollowFromAwaitTheir = (r: Row) => { if (!ask()) return; const ns = clone(state)
+  const unfollowFromAwaitTheir = async (r: Row) => { if (!(await ask())) return; const ns = clone(state)
     ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     pushEvent(ns, 'remove', `${r.handle}: removed from await_their`); write(ns)
   }
@@ -131,19 +140,25 @@ export default function ProfilePage(){
     ns.lists.mutual     = [{ ...r, days: r.days ?? 0 }, ...ns.lists.mutual]
     pushEvent(ns, 'move', `${r.handle}: await_ours → mutual`); write(ns)
   }
-  const declineFromAwaitOurs = (r: Row) => { if (!ask()) return; const ns = clone(state)
+  const declineFromAwaitOurs = async (r: Row) => { if (!(await ask())) return; const ns = clone(state)
     ns.lists.await_ours = ns.lists.await_ours.filter(x => x.id !== r.id)
     pushEvent(ns, 'remove', `${r.handle}: declined in await_ours`); write(ns)
   }
-  const softRemove = (from: 'await_their' | 'await_ours', r: Row) => { if (!ask()) return; const ns = clone(state)
+  const softRemove = async (from: 'await_their' | 'await_ours', r: Row) => { if (!(await ask())) return; const ns = clone(state)
     if (from === 'await_their') ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     if (from === 'await_ours')  ns.lists.await_ours  = ns.lists.await_ours .filter(x => x.id !== r.id)
     ns.removed = [{ from, row: r }, ...ns.removed]; pushEvent(ns, 'soft-remove', `${r.handle}: removed from ${from}`); write(ns)
   }
-  const restoreRemoved = () => { if (!removed.length) return; const ns = clone(state)
-    removed.forEach(({ from, row }) => { if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
-                                         if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours] })
-    ns.removed = []; pushEvent(ns, 'restore', `Restored ${removed.length} profiles`); write(ns)
+  const restoreRemoved = () => {
+    if (!removed.length) return
+    const ns = clone(state)
+    removed.forEach(({ from, row }) => {
+      if (from === 'await_their') ns.lists.await_their = [row, ...ns.lists.await_their]
+      if (from === 'await_ours')  ns.lists.await_ours  = [row, ...ns.lists.await_ours]
+    })
+    ns.removed = []
+    pushEvent(ns, 'restore', `Restored ${removed.length} profiles`)
+    write(ns)
   }
 
   const toOnline = () => { const ns = clone(state)
@@ -169,17 +184,14 @@ export default function ProfilePage(){
     pushEvent(ns, 'status:set', 'You switched to LONG'); write(ns)
   }
 
-  // голосование с учётом dev-флагов
+  // Голосование: учитываем dev-флаги (безлимит и форс-день)
   const vote = (r: Row, dir: 'up' | 'down') => {
     const ns = clone(state)
     const list = tab === 'mutual' ? ns.lists.mutual : ns.lists.await_their
     const idx = list.findIndex(x => x.id === r.id); if (idx < 0) return
     const row = { ...list[idx] }
 
-    // базовое правило
     const baseAllowed = canVoteOnRow(row, tab, Date.now())
-
-    // разрешим голосовать при форсе-дня, если всё остальное ок и еще не голосовали
     const dayBypassAllowed =
       (tab !== 'await_ours') &&
       ((row.statusMode ?? 'online') === 'online') &&
@@ -255,7 +267,7 @@ export default function ProfilePage(){
 
       <h1 className="text-3xl font-bold mb-6 text-center">Profile</h1>
 
-      {/* ===== DEV MENU (минимально, без изменения геометрии карточек) ===== */}
+      {/* ===== DEV MENU (добавлено; остальная геометрия не менялась) ===== */}
       <div className="card p-3 mb-4">
         <div className="text-xs uppercase tracking-wider text-white/60">Dev menu</div>
         <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -369,7 +381,7 @@ export default function ProfilePage(){
           <div className="space-y-4">
             {rows.length === 0 && <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r => {
-              // базовая доступность + dev-обход
+              // Базовая проверка + dev-блокировки
               const baseCan = canVoteOnRow(r, tab, nowTs)
               const dayBypassAllowed =
                 (tab !== 'await_ours') &&
@@ -396,23 +408,24 @@ export default function ProfilePage(){
                       ? 'border-red-400/30 bg-red-500/5'
                       : 'border-white/10 bg-white/5'}`}
                 >
-                    {/* МЯГКОЕ УДАЛЕНИЕ × — ТОЛЬКО в await_their / await_ours */}
-    {(tab === 'await_their' || tab === 'await_ours') && (
-      <button
-        onClick={(e) => { e.stopPropagation(); softRemove(tab as ('await_their' | 'await_ours'), r) }}
-        title="Remove from this tab"
-        aria-label="Remove"
-        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20
-                   text-white/80 leading-none flex items-center justify-center"
-      >
-        ×
-      </button>
-    )}
+                  {/* МЯГКОЕ УДАЛЕНИЕ × — центр в правом верхнем углу карточки */}
+                  {(tab === 'await_their' || tab === 'await_ours') && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); softRemove(tab as ('await_their' | 'await_ours'), r) }}
+                      title="Remove from this tab"
+                      aria-label="Remove"
+                      className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2
+                                 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20
+                                 text-white/80 leading-none flex items-center justify-center z-10"
+                    >
+                      ×
+                    </button>
+                  )}
 
                   {/* LEFT: аватар + статус под аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
-                      {/* Было: avatar-ring-sm с ratingColor; стало: AvatarRing с negProgress */}
+                      {/* заменили внутренний аватар на AvatarRing — размеры сохранены */}
                       <AvatarRing
                         src={r.avatarUrl || 'https://unavatar.io/x/twitter'}
                         size={48}
@@ -427,7 +440,7 @@ export default function ProfilePage(){
                     </div>
                   </div>
 
-                  {/* MIDDLE: кнопки голосования — показываем ТОЛЬКО в день голосования (или форс) */}
+                  {/* MIDDLE: кнопки голосования — ТОЛЬКО в день голосования (или форс) */}
                   {voteDay && (
                     <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                       {/* ЗА */}
@@ -504,7 +517,7 @@ export default function ProfilePage(){
           <div className="card p-5 flex flex-col items-center">
             {selectedRow ? (
               <>
-                {/* Было: avatar-ring-xl с ratingColor; стало: AvatarRing с negProgress */}
+                {/* заменили внутренний аватар на AvatarRing — размеры сохранены */}
                 <AvatarRing
                   src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'}
                   size={120}
@@ -526,6 +539,20 @@ export default function ProfilePage(){
           </div>
         </aside>
       </div>
+
+      {/* ===== Кастомный confirm-диалог (как туториал) ===== */}
+      {confirmBox.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="w-[92%] max-w-[520px] rounded-2xl border border-white/10 bg-[rgba(10,10,16,0.96)] p-6 shadow-2xl">
+            <h3 className="text-2xl font-bold mb-2">Confirm</h3>
+            <p className="text-white/80">{confirmBox.message || 'Confirm your choice?'}</p>
+            <div className="mt-5 flex gap-2 justify-end">
+              <button className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15" onClick={() => closeConfirm(false)}>Cancel</button>
+              <button className="px-3 py-2 rounded-xl bg-[#7C5CFF] hover:bg-[#9A86FF]" onClick={() => closeConfirm(true)}>Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
