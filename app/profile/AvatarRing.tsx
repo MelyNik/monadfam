@@ -1,20 +1,18 @@
 'use client'
-import React from 'react'
+import React, { useId } from 'react'
 
 type Props = {
   src: string
   alt?: string
-  size?: number        // общий диаметр, px
+  size?: number        // диаметр, px
   thickness?: number   // толщина кольца, px
-  negProgress?: number // 0..1 — доля покраснения (net)
+  negProgress?: number // 0..1 — насколько «покраснело» по дуге
   className?: string
 }
 
 /**
  * База: ровное зелёное кольцо.
- * Красная дуга: растёт ПРОТИВ часовой от 9ч.
- * Реализовано без foreignObject/SVG-математики — чистым HTML/CSS (conic-gradient + mask),
- * чтобы избежать "красной точки" и проблем с типами.
+ * Дуга: красная, растёт ПРОТИВ часовой, старт в 9ч. При 0 — дугу не рисуем (нет «точки»).
  */
 export default function AvatarRing({
   src,
@@ -25,72 +23,67 @@ export default function AvatarRing({
   className = '',
 }: Props) {
   const s = size
-  const t = thickness
-  const inner = s - t
+  const r = (s - thickness) / 2
+  const c = 2 * Math.PI * r
+
+  // ограничим прогресс
   const prog = Math.max(0, Math.min(1, negProgress))
   const showArc = prog > 0.0001
-  const deg = prog * 360 // угол покраснения
+
+  const inner = s - thickness
+  const clipId = useId()
+
+  // Поворачиваем старт дуги в 9ч и пускаем ПРОТИВ часовой:
+  // применяются справа налево (rotate -> scale -> translate)
+  const gTransform = `translate(${s} 0) scale(-1 1) rotate(180 ${s / 2} ${s / 2})`
 
   return (
-    <div className={className} style={{ width: s, height: s, position: 'relative' }}>
-      {/* БАЗОВОЕ КОЛЬЦО: зелёный обод + тёмная внутренняя "пробка" */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          borderRadius: '9999px',
-          background: '#22c55e',          // зелёная база
-          display: 'grid',
-          placeItems: 'center',
-        }}
-      >
-        <div
-          style={{
-            width: inner,
-            height: inner,
-            borderRadius: '9999px',
-            background: '#0f0f15',
-          }}
-        />
-      </div>
+    <div className={className} style={{ width: s, height: s }}>
+      <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} aria-hidden={alt ? undefined : true}>
+        <defs>
+          <clipPath id={clipId}>
+            <circle cx={s / 2} cy={s / 2} r={inner / 2} />
+          </clipPath>
+        </defs>
 
-      {/* КРАСНАЯ ДУГА: против часовой от 9ч */}
-      {showArc && (
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute',
-            inset: 0,
-            borderRadius: '9999px',
-            // conic-gradient всегда растёт ПО часовой; чтобы получить ПРОТИВ —
-            // зеркалим по X и стартуем "с 3ч" (90deg), что после зеркала = 9ч
-            transform: 'scaleX(-1)',
-            background: `conic-gradient(from 90deg, #dc2626 0deg, #dc2626 ${deg}deg, transparent ${deg}deg)`,
-            // маска: превращаем заливку в "обод" нужной толщины
-            WebkitMask: `radial-gradient(circle at 50% 50%, transparent ${inner/2}px, #000 ${inner/2 + 0.5}px)`,
-            mask: `radial-gradient(circle at 50% 50%, transparent ${inner/2}px, #000 ${inner/2 + 0.5}px)`,
-          }}
+        {/* База — цельное зелёное кольцо */}
+        <circle
+          cx={s / 2}
+          cy={s / 2}
+          r={r}
+          fill="none"
+          stroke="#22c55e"            // green-500
+          strokeWidth={thickness}
         />
-      )}
 
-      {/* ФОТО */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={alt}
-        style={{
-          position: 'absolute',
-          left: t / 2,
-          top: t / 2,
-          width: inner,
-          height: inner,
-          borderRadius: '9999px',
-          objectFit: 'cover',
-          background: '#1a1a1f',
-          border: '2px solid #fff',
-        }}
-      />
+        {/* Красная дуга — рисуем только если prog > 0 (чтобы не было «красной точки») */}
+        {showArc && (
+          <g transform={gTransform}>
+            <circle
+              cx={s / 2}
+              cy={s / 2}
+              r={r}
+              fill="none"
+              stroke="#dc2626"         // red-600
+              strokeWidth={thickness}
+              strokeLinecap="round"
+              strokeDasharray={`${prog * c} ${c}`}
+              strokeDashoffset="0"
+            />
+          </g>
+        )}
+
+        {/* Фото внутри круга */}
+        <image
+          href={src}
+          x={thickness / 2}
+          y={thickness / 2}
+          width={inner}
+          height={inner}
+          clipPath={`url(#${clipId})`}
+          preserveAspectRatio="xMidYMid slice"
+        />
+      </svg>
       {alt ? <span className="sr-only">{alt}</span> : null}
     </div>
   )
