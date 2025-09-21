@@ -6,8 +6,6 @@ import {
   resetDemoData, pushEvent, ratingColor
 } from '../../lib/state'
 
-import AvatarRing from './AvatarRing'
-
 const MS30D = 30 * 24 * 60 * 60 * 1000
 
 function fmtLeft(ms: number) {
@@ -38,42 +36,12 @@ function statusBadge(r: Row) {
   return { label: 'лонг', className: 'bg-red-600/25 text-red-300' }
 }
 
-/* Один и тот же знак «палец», для down — поворот */
+/* Один и тот же знак «палец», для down — поворот (визуально идентичные) */
 const Thumb = (props:any) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" {...props}>
     <path d="M2 10h4v12H2V10zm8 12h6a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4l.8-4.2A2 2 0 0 0 10 5l-4 7v10z"/>
   </svg>
 )
-
-/* ===== кап для покраснения кольца + helper ===== */
-const NEG_CAP = 20 // сколько «чистых» минусов нужно, чтобы окрасить полный круг
-function negProgressOf(r: Row) {
-  const up = r.votesUp ?? 0
-  const down = r.votesDown ?? 0
-  const netNeg = Math.max(0, down - up)
-  return Math.min(1, netNeg / NEG_CAP)
-}
-
-/* утилита: найти актуальный Row по id во всех списках (для правого сайдбара) */
-function findRowById(state: AppState, id: number): Row | null {
-  const { lists } = state
-  return (
-    lists.mutual.find(x => x.id === id) ||
-    lists.await_their.find(x => x.id === id) ||
-    lists.await_ours.find(x => x.id === id) ||
-    null
-  )
-}
-
-/* ===== helpers для дев-меню (не трогают верстку) ===== */
-function forceVotingTs(ts: number) {
-  const d = new Date(ts)
-  const dow = d.getDay()
-  if (dow === 2 || dow === 6) return ts
-  // сдвигаем к ближайшему вторнику
-  const delta = (2 - dow + 7) % 7
-  return ts + delta * 86400_000
-}
 
 export default function ProfilePage(){
   const [state, setState] = useState<AppState>(() => loadState())
@@ -81,25 +49,13 @@ export default function ProfilePage(){
   const [q, setQ]         = useState('')
   const [selected, setSelected] = useState<Row | null>(null)
 
-  // ===== кастомный confirm (вместо window.confirm)
-  type Resolver = (v: boolean) => void
-  const [confirmBox, setConfirmBox] = useState<{open:boolean; message:string; resolve?:Resolver}>({ open:false, message:'' })
-  const ask = (msg = 'Confirm your choice?') =>
-    new Promise<boolean>((resolve) => setConfirmBox({ open: true, message: msg, resolve }))
-  const closeConfirm = (v: boolean) => { confirmBox.resolve?.(v); setConfirmBox({ open:false, message:'' }) }
-
-  // "текущее время" раз в минуту — чтобы в полночь кнопки появились/исчезли
+  // обновляем "текущее время" раз в минуту, чтобы в полночь кнопки появились/исчезли
   const [nowTs, setNowTs] = useState(() => Date.now())
   useEffect(() => {
     const t = setInterval(() => setNowTs(Date.now()), 60_000)
     return () => clearInterval(t)
   }, [])
-
-  /* ====== DEV MENU flags (локальные, чтобы ничего не ломать) ====== */
-  const [devForceVotingDay, setDevForceVotingDay] = useState(false)
-  const [devAllowMultiVotes, setDevAllowMultiVotes] = useState(false)
-
-  const voteDay = devForceVotingDay || isVotingDay(nowTs)
+  const voteDay = isVotingDay(nowTs)
 
   const qNorm = q.toLowerCase().replace(/^@/, '')
   const match = (r: Row) => {
@@ -139,14 +95,14 @@ export default function ProfilePage(){
 
   const counts = { mutual: lists.mutual.length, await_their: lists.await_their.length, await_ours: lists.await_ours.length }
   const write = (ns: AppState) => { saveState(ns); setState(ns) }
+  const ask = (msg = 'Confirm your choice?') => window.confirm(msg)
 
-  // ===== действия с подтверждением
-  const unfollowFromMutual = async (r: Row) => { if (!(await ask())) return; const ns = clone(state)
+  const unfollowFromMutual = (r: Row) => { if (!ask()) return; const ns = clone(state)
     ns.lists.mutual = ns.lists.mutual.filter(x => x.id !== r.id)
     ns.lists.await_ours = [{ ...r, days: 0 }, ...ns.lists.await_ours]
     pushEvent(ns, 'move', `${r.handle}: mutual → await_ours`); write(ns)
   }
-  const unfollowFromAwaitTheir = async (r: Row) => { if (!(await ask())) return; const ns = clone(state)
+  const unfollowFromAwaitTheir = (r: Row) => { if (!ask()) return; const ns = clone(state)
     ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     pushEvent(ns, 'remove', `${r.handle}: removed from await_their`); write(ns)
   }
@@ -155,11 +111,11 @@ export default function ProfilePage(){
     ns.lists.mutual     = [{ ...r, days: r.days ?? 0 }, ...ns.lists.mutual]
     pushEvent(ns, 'move', `${r.handle}: await_ours → mutual`); write(ns)
   }
-  const declineFromAwaitOurs = async (r: Row) => { if (!(await ask())) return; const ns = clone(state)
+  const declineFromAwaitOurs = (r: Row) => { if (!ask()) return; const ns = clone(state)
     ns.lists.await_ours = ns.lists.await_ours.filter(x => x.id !== r.id)
     pushEvent(ns, 'remove', `${r.handle}: declined in await_ours`); write(ns)
   }
-  const softRemove = async (from: 'await_their' | 'await_ours', r: Row) => { if (!(await ask())) return; const ns = clone(state)
+  const softRemove = (from: 'await_their' | 'await_ours', r: Row) => { if (!ask()) return; const ns = clone(state)
     if (from === 'await_their') ns.lists.await_their = ns.lists.await_their.filter(x => x.id !== r.id)
     if (from === 'await_ours')  ns.lists.await_ours  = ns.lists.await_ours .filter(x => x.id !== r.id)
     ns.removed = [{ from, row: r }, ...ns.removed]; pushEvent(ns, 'soft-remove', `${r.handle}: removed from ${from}`); write(ns)
@@ -197,22 +153,10 @@ export default function ProfilePage(){
     const ns = clone(state)
     const list = tab === 'mutual' ? ns.lists.mutual : ns.lists.await_their
     const idx = list.findIndex(x => x.id === r.id); if (idx < 0) return
-    const row = { ...list[idx] }
-
-    // Учитываем дев-флаги:
-    const nowForCheck = devForceVotingDay ? forceVotingTs(Date.now()) : Date.now()
-    if (!devAllowMultiVotes && row.myVote) return
-    if (!canVoteOnRow({ ...row, myVote: devAllowMultiVotes ? undefined : row.myVote } as Row, tab, nowForCheck)) return
-
+    const row = { ...list[idx] }; if (row.myVote) return; if (!canVoteOnRow(row, tab, Date.now())) return
     if (dir === 'up')   row.votesUp   = (row.votesUp   ?? 0) + 1
     if (dir === 'down') row.votesDown = (row.votesDown ?? 0) + 1
-    if (!devAllowMultiVotes) row.myVote = dir
-
-    list[idx] = row
-    pushEvent(ns, 'vote', `${row.handle}: ${dir}`); write(ns)
-
-    // мгновенно обновляем правый сайдбар, если выбран этот профиль
-    setSelected(prev => (prev && prev.id === row.id) ? row : prev)
+    row.myVote = dir; list[idx] = row; pushEvent(ns, 'vote', `${row.handle}: ${dir}`); write(ns)
   }
 
   const shortCountdown = useMemo(() => {
@@ -240,11 +184,7 @@ export default function ProfilePage(){
     )
   }
 
-  // актуальная запись выбранного профиля — правый блок всегда синхронизирован
-  const selectedRow = selected
-    ? (findRowById(state, selected.id) ?? selected)
-    : rows[0] ?? null
-
+  const selectedRow = selected ?? rows[0] ?? null
   const doReset = () => { const s = resetDemoData(); setState(s) }
 
   /* ===== счётчики Followers / Following (уникальные) ===== */
@@ -354,15 +294,13 @@ export default function ProfilePage(){
           <div className="space-y-4">
             {rows.length === 0 && <div className="text-white/60 p-3">Nothing found.</div>}
             {rows.map(r => {
-              // учитываем дев-флаг "всегда день голосования"
-              const nowForCheck = devForceVotingDay ? forceVotingTs(nowTs) : nowTs
-              const can   = canVoteOnRow(r, tab, nowForCheck)
+              const can   = canVoteOnRow(r, tab, nowTs)
               const b     = statusBadge(r)
               const whyDisabled =
-                (r.myVote && !devAllowMultiVotes) ? 'You have already voted for this profile'
+                r.myVote ? 'You have already voted for this profile'
                 : (tab === 'await_ours' ? 'Voting is not available in this tab'
                 : ((r.statusMode ?? 'online') !== 'online' ? 'User is absent (short/long)'
-                : (!isVotingDay(nowForCheck) ? 'Voting is available only on Tuesday and Saturday'
+                : (!isVotingDay(nowTs) ? 'Voting is available only on Tuesday and Saturday'
                 : ((r.days ?? 0) < 4 ? 'Available after 4 days in lists' : ''))))
 
               return (
@@ -374,30 +312,30 @@ export default function ProfilePage(){
                       ? 'border-red-400/30 bg-red-500/5'
                       : 'border-white/10 bg-white/5'}`}
                 >
-                  {/* МЯГКОЕ УДАЛЕНИЕ × — центр в правом верхнем углу карточки */}
-                  {(tab === 'await_their' || tab === 'await_ours') && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); softRemove(tab as ('await_their' | 'await_ours'), r) }}
-                      title="Remove from this tab"
-                      aria-label="Remove"
-                      className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2
-                                 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20
-                                 text-white/80 leading-none flex items-center justify-center z-10"
-                    >
-                      ×
-                    </button>
-                  )}
+                    {/* МЯГКОЕ УДАЛЕНИЕ × — ТОЛЬКО в await_their / await_ours */}
+    {(tab === 'await_their' || tab === 'await_ours') && (
+      <button
+        onClick={(e) => { e.stopPropagation(); softRemove(tab as ('await_their' | 'await_ours'), r) }}
+        title="Remove from this tab"
+        aria-label="Remove"
+        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20
+                   text-white/80 leading-none flex items-center justify-center"
+      >
+        ×
+      </button>
+    )}
 
                   {/* LEFT: аватар + статус под аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
-                      {/* AvatarRing как был */}
-                      <AvatarRing
-                        src={r.avatarUrl || 'https://unavatar.io/x/twitter'}
-                        size={48}
-                        thickness={3}
-                        negProgress={negProgressOf(r)}
-                      />
+                      <div
+                        className="avatar-ring-sm"
+                        style={{ ['--ring-colors' as any]: ratingColor(r) }}
+                      >
+                        <div className="avatar-ring-sm-inner">
+                          <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
+                        </div>
+                      </div>
                       <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full ${b.className}`}>{b.label}</div>
                     </div>
                     <div className="leading-5">
@@ -406,7 +344,7 @@ export default function ProfilePage(){
                     </div>
                   </div>
 
-                  {/* MIDDLE: кнопки голосования — ТОЛЬКО в день голосования (или devForce) */}
+                  {/* MIDDLE: кнопки голосования — показываем ТОЛЬКО в день голосования */}
                   {voteDay && (
                     <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                       {/* ЗА */}
@@ -483,13 +421,14 @@ export default function ProfilePage(){
           <div className="card p-5 flex flex-col items-center">
             {selectedRow ? (
               <>
-                {/* справа — тоже AvatarRing, обновляется мгновенно */}
-                <AvatarRing
-                  src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'}
-                  size={120}
-                  thickness={5}
-                  negProgress={negProgressOf(selectedRow)}
-                />
+                <div
+                  className="avatar-ring-xl"
+                  style={{ ['--ring-colors' as any]: ratingColor(selectedRow) }}
+                >
+                  <div className="avatar-ring-xl-inner">
+                    <img src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'} alt={selectedRow.handle} className="avatar-xl"/>
+                  </div>
+                </div>
                 <div className="mt-5 text-center">
                   <div className="font-semibold text-lg">{selectedRow.name}</div>
                   <div className="text-sm text-white/70">{selectedRow.handle}</div>
@@ -505,62 +444,6 @@ export default function ProfilePage(){
           </div>
         </aside>
       </div>
-
-      {/* ====== DEV MENU (fixed, не влияет на геометрию) ====== */}
-      <div className="fixed bottom-5 right-6 z-50 card px-4 py-3 text-sm">
-        <div className="font-semibold mb-2">Dev menu</div>
-        <label className="flex items-center gap-2 mb-2">
-          <input type="checkbox" checked={devForceVotingDay} onChange={e => setDevForceVotingDay(e.target.checked)} />
-          <span>Всегда день голосования</span>
-        </label>
-        <label className="flex items-center gap-2 mb-3">
-          <input type="checkbox" checked={devAllowMultiVotes} onChange={e => setDevAllowMultiVotes(e.target.checked)} />
-          <span>Мульти-голоса</span>
-        </label>
-
-        <div className="flex items-center gap-2">
-          <button
-            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15"
-            onClick={() => {
-              if (!selectedRow) return
-              const ns = clone(state)
-              const row = findRowById(ns, selectedRow.id)
-              if (!row) return
-              row.votesUp = (row.votesUp ?? 0) + 1
-              pushEvent(ns, 'vote', `${row.handle}: dev +1 up`)
-              saveState(ns); setState(ns)
-              setSelected(prev => prev && prev.id === row.id ? { ...row } : prev)
-            }}
-          >+1 up</button>
-          <button
-            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15"
-            onClick={() => {
-              if (!selectedRow) return
-              const ns = clone(state)
-              const row = findRowById(ns, selectedRow.id)
-              if (!row) return
-              row.votesDown = (row.votesDown ?? 0) + 1
-              pushEvent(ns, 'vote', `${row.handle}: dev +1 down`)
-              saveState(ns); setState(ns)
-              setSelected(prev => prev && prev.id === row.id ? { ...row } : prev)
-            }}
-          >+1 down</button>
-        </div>
-      </div>
-
-      {/* ===== Кастомный confirm-диалог (как туториал) ===== */}
-      {confirmBox.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="w-[92%] max-w-[520px] rounded-2xl border border-white/10 bg-[rgba(10,10,16,0.96)] p-6 shadow-2xl">
-            <h3 className="text-2xl font-bold mb-2">Confirm</h3>
-            <p className="text-white/80">{confirmBox.message || 'Confirm your choice?'}</p>
-            <div className="mt-5 flex gap-2 justify-end">
-              <button className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15" onClick={() => closeConfirm(false)}>Cancel</button>
-              <button className="px-3 py-2 rounded-xl bg-[#7C5CFF] hover:bg-[#9A86FF]" onClick={() => closeConfirm(true)}>Confirm</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
