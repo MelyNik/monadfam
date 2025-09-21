@@ -6,7 +6,7 @@ import {
   resetDemoData, pushEvent, ratingColor
 } from '../../lib/state'
 
-import AvatarRing from './AvatarRing'
+// import AvatarRing from './AvatarRing' // ⬅️ НЕ ИСПОЛЬЗУЕМ, чтобы не ломать геометрию
 
 const MS30D = 30 * 24 * 60 * 60 * 1000
 
@@ -45,13 +45,24 @@ const Thumb = (props:any) => (
   </svg>
 )
 
-/* ===== кап для покраснения кольца + helper ===== */
+/* ===== кап для покраснения кольца + helpers (ТОЛЬКО ЛОГИКА ЦВЕТА, верстку не трогаем) ===== */
 const NEG_CAP = 20 // сколько «чистых» минусов нужно, чтобы окрасить полный круг
+
+// 0..1 — доля покраснения (чистый минус = down - up)
 function negProgressOf(r: Row) {
   const up = r.votesUp ?? 0
   const down = r.votesDown ?? 0
   const netNeg = Math.max(0, down - up)
   return Math.min(1, netNeg / NEG_CAP)
+}
+
+// Локальный конусный градиент: база зелёная, красная дуга растёт ПРОТИВ часовой от 9ч.
+// from 180deg => «9 часов», красный сегмент занимает последние deg градусов.
+function ringFromNeg(progress: number) {
+  const p = Math.max(0, Math.min(1, progress))
+  const deg = Math.round(p * 360)
+  const cut = 360 - deg
+  return `conic-gradient(from 180deg, #22c55e 0deg ${cut}deg, #dc2626 ${cut}deg 360deg)`
 }
 
 /* утилита: найти актуальный Row по id во всех списках (для правого сайдбара) */
@@ -305,7 +316,8 @@ export default function ProfilePage(){
         <aside className="card p-5 flex-shrink-0 w-[360px] flex flex-col items-center">
           <div
             className="relative group avatar-ring-xl"
-            style={{ ['--ring-colors' as any]: 'hsl(120 70% 50%)' }}
+            // Слева — всегда зелёное кольцо (ваш профиль)
+            style={{ ['--ring-colors' as any]: 'conic-gradient(from 180deg, #22c55e 0deg 360deg)' }}
           >
             <div className="avatar-ring-xl-inner">
               <img src={yourAvatar} alt="you" className="avatar-xl"/>
@@ -367,13 +379,15 @@ export default function ProfilePage(){
                   {/* LEFT: аватар + статус под аватаром + имя/handle */}
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center">
-                      {/* было: градиентные классы; стало: AvatarRing с прогрессом */}
-                      <AvatarRing
-                        src={r.avatarUrl || 'https://unavatar.io/x/twitter'}
-                        size={48}
-                        thickness={3}              // сделал чуть толще, чтобы обод был заметен
-                        negProgress={negProgressOf(r)}
-                      />
+                      {/* ВОЗВРАТ К ИСХОДНОЙ ГЕОМЕТРИИ + локальный градиент кольца */}
+                      <div
+                        className="avatar-ring-sm"
+                        style={{ ['--ring-colors' as any]: ringFromNeg(negProgressOf(r)) }}
+                      >
+                        <div className="avatar-ring-sm-inner">
+                          <img src={r.avatarUrl || 'https://unavatar.io/x/twitter'} alt={r.handle} className="avatar-sm"/>
+                        </div>
+                      </div>
                       <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full ${b.className}`}>{b.label}</div>
                     </div>
                     <div className="leading-5">
@@ -384,7 +398,7 @@ export default function ProfilePage(){
 
                   {/* MIDDLE: кнопки голосования — ТОЛЬКО в день голосования */}
                   {voteDay && (
-                    <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items中心 gap-3" onClick={(e) => e.stopPropagation()}>
                       {/* ЗА */}
                       <button
                         disabled={!can}
@@ -459,13 +473,16 @@ export default function ProfilePage(){
           <div className="card p-5 flex flex-col items-center">
             {selectedRow ? (
               <>
-                {/* заменили на AvatarRing, чтобы справа обновлялось сразу после голоса */}
-                <AvatarRing
-                  src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'}
-                  size={120}
-                  thickness={5}
-                  negProgress={negProgressOf(selectedRow)}
-                />
+                {/* ВОЗВРАТ К ИСХОДНОЙ ГЕОМЕТРИИ + такой же локальный градиент */}
+                <div
+                  className="avatar-ring-xl"
+                  style={{ ['--ring-colors' as any]: ringFromNeg(negProgressOf(selectedRow)) }}
+                >
+                  <div className="avatar-ring-xl-inner">
+                    <img src={selectedRow.avatarUrl || 'https://unavatar.io/x/twitter'} alt={selectedRow.handle} className="avatar-xl"/>
+                  </div>
+                </div>
+
                 <div className="mt-5 text-center">
                   <div className="font-semibold text-lg">{selectedRow.name}</div>
                   <div className="text-sm text-white/70">{selectedRow.handle}</div>
